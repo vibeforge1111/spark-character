@@ -139,12 +139,16 @@ def attach_search_context(
 def _duckduckgo_html_search(query: str) -> list[SearchResult]:
     """Default backend: DuckDuckGo HTML scrape. No auth, no key.
 
+    Hits html.duckduckgo.com (the result-serving subdomain) with a
+    GET. The bare duckduckgo.com/html/ root returns the home page on
+    POST and is bot-rate-limited.
+
     Returns up to ~10 results parsed from the HTML. Best-effort: the
     HTML format may change, in which case this returns []. Callers
     should not rely on it for production-critical paths until paired
-    with a stable API search backend.
+    with a stable API search backend (Brave, Serper, SerpAPI).
     """
-    url = "https://duckduckgo.com/html/"
+    url = "https://html.duckduckgo.com/html/"
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -153,7 +157,7 @@ def _duckduckgo_html_search(query: str) -> list[SearchResult]:
         ),
     }
     with httpx.Client(timeout=8.0, follow_redirects=True) as client:
-        resp = client.post(url, data={"q": query}, headers=headers)
+        resp = client.get(url, params={"q": query}, headers=headers)
         resp.raise_for_status()
         html_text = resp.text
     return _parse_duckduckgo_html(html_text)
