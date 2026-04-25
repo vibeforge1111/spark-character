@@ -39,6 +39,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .chip_loader import PersonalityChip
+
 DEFAULT_LAB_PATH = Path(os.path.expanduser(
     "~/Desktop/spark-personality-chip-labs/personalities"
 ))
@@ -111,6 +113,61 @@ def promote_evolved_persona_to_chip_lab(
     target = lab / f"{new_chip_id}.personality.yaml"
     target.write_text(
         yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    return target
+
+
+def promote_evolved_chip_to_chip_lab(
+    *,
+    chip: PersonalityChip,
+    base_chip_id: str,
+    base_persona_version: str,
+    new_persona_version: str,
+    voice_rules_override: str | None = None,
+    composite_score: float | None = None,
+    delta_summary: dict[str, Any] | None = None,
+    lab_path: Path | None = None,
+) -> Path | None:
+    """Promote a fully evolved PersonalityChip (with mutated trait values)
+    back to the chip lab as a native chip yaml.
+
+    Unlike promote_evolved_persona_to_chip_lab (which writes a sidecar
+    with voice_rules_override on top of the unchanged base chip), this
+    function writes a real chip yaml with the new trait values, new
+    emotional_range entries, and optionally a system-prompt override.
+
+    Returns the written path, or None if PyYAML isn't available or the
+    chip lab is missing locally.
+    """
+    try:
+        import yaml  # type: ignore
+    except ImportError:
+        return None
+    from .trait_mutator import chip_to_yaml_dict  # local import to avoid cycle
+
+    lab = lab_path or find_chip_lab_path()
+    if lab is None:
+        return None
+
+    spec = chip_to_yaml_dict(chip)
+    new_chip_id = f"{base_chip_id}-evolved-{new_persona_version.replace('.', '-')}"
+    spec.setdefault("identity", {})
+    spec["identity"]["id"] = new_chip_id
+    spec["spark_character_evolved"] = {
+        "base_chip_id": base_chip_id,
+        "base_persona_version": base_persona_version,
+        "new_persona_version": new_persona_version,
+        "composite_score": float(composite_score) if composite_score is not None else None,
+        "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "delta_summary": delta_summary or {},
+    }
+    if voice_rules_override:
+        spec["voice_rules_override"] = voice_rules_override.strip()
+
+    target = lab / f"{new_chip_id}.personality.yaml"
+    target.write_text(
+        yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
         encoding="utf-8",
     )
     return target

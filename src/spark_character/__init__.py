@@ -65,7 +65,17 @@ from .memory_grounded import (
 )
 from .registry import (
     find_chip_lab_path,
+    promote_evolved_chip_to_chip_lab,
     promote_evolved_persona_to_chip_lab,
+)
+from .trait_mutator import (
+    EMOTIONAL_PROFILE_FIELDS,
+    EMOTIONAL_RANGE_KEYS,
+    MAX_DELTA_PER_TRAIT,
+    TRAIT_FIELDS,
+    TraitMutationResult,
+    chip_to_yaml_dict,
+    mutate_trait_values,
 )
 from .probes import (
     PROBES,
@@ -113,15 +123,23 @@ __all__ = [
     "chip_context_for",
     "find_chip_lab_path",
     "known_chip_keys",
+    "promote_evolved_chip_to_chip_lab",
     "promote_evolved_persona_to_chip_lab",
     "load_chip",
     "load_chip_by_id",
     "persona_from_chip",
     "render_chip_to_system_prompt",
+    "EMOTIONAL_PROFILE_FIELDS",
+    "EMOTIONAL_RANGE_KEYS",
+    "MAX_DELTA_PER_TRAIT",
     "STABILITY_SCENARIOS",
     "T6_EMOTIONAL_ATTUNEMENT_PROBES",
     "T7_MEMORY_COHERENCE_PROBES",
     "T8_INITIATIVE_PROBES",
+    "TRAIT_FIELDS",
+    "TraitMutationResult",
+    "chip_to_yaml_dict",
+    "mutate_trait_values",
     "DeepProbe",
     "DeepProbeResult",
     "UserInstruction",
