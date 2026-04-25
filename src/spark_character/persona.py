@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
+LATEST_POINTER = ARTIFACTS_DIR / "persona.latest.txt"
 DEFAULT_PERSONA_VERSION = "v1"
 
 
@@ -23,11 +24,39 @@ class PersonaSpec:
         return self.text.strip()
 
 
-def load_persona(version: str = DEFAULT_PERSONA_VERSION) -> PersonaSpec:
-    path = ARTIFACTS_DIR / f"persona.{version}.md"
+def resolve_latest_persona_version() -> str:
+    """Resolve which persona version is currently active.
+
+    Priority:
+      1. persona.latest.txt pointer (written by the evolution loop on
+         promotion).
+      2. Highest-numbered persona.vN.md file on disk.
+      3. DEFAULT_PERSONA_VERSION as the final fallback.
+    """
+    if LATEST_POINTER.exists():
+        text = LATEST_POINTER.read_text(encoding="utf-8").strip()
+        if text:
+            return text
+    versions: list[int] = []
+    for path in ARTIFACTS_DIR.glob("persona.v*.md"):
+        try:
+            n = int(path.stem.split(".v", 1)[-1])
+            versions.append(n)
+        except ValueError:
+            continue
+    if versions:
+        return f"v{max(versions)}"
+    return DEFAULT_PERSONA_VERSION
+
+
+def load_persona(version: str | None = None) -> PersonaSpec:
+    """Load a persona artifact. Pass a version like 'v1' / 'v2' to pin
+    explicitly, or omit to auto-resolve to the active one."""
+    resolved = version or resolve_latest_persona_version()
+    path = ARTIFACTS_DIR / f"persona.{resolved}.md"
     if not path.exists():
         raise FileNotFoundError(f"Persona artifact not found: {path}")
-    return PersonaSpec(version=version, text=path.read_text(encoding="utf-8"))
+    return PersonaSpec(version=resolved, text=path.read_text(encoding="utf-8"))
 
 
 def load_persona_from_path(path: str | Path) -> PersonaSpec:
