@@ -266,15 +266,45 @@ def mutate_persona(provider: ProviderSpec, baseline: PersonaSpec, weaknesses: li
         f"{baseline.system_prompt}\n\n"
         "[Observed weaknesses on real model output]\n"
         + "\n".join(f"- {w}" for w in weaknesses)
-        + "\n\n[Task]\nProduce one improved variant of the persona spec markdown that addresses these weaknesses while keeping all hard constraints. Output the markdown only."
+        + "\n\n[Task]\nProduce one improved variant of the persona spec markdown that addresses these weaknesses while keeping all hard constraints. Output ONLY the final markdown spec. Do not include analysis steps, planning, code fences, or any other preamble or commentary. The first line of your output must be a heading like '# Spark persona vN'."
     )
-    return call_provider(
+    raw = call_provider(
         provider=provider,
         system_prompt=MUTATOR_SYSTEM,
         user_prompt=user_prompt,
-        max_tokens=1100,
+        max_tokens=1400,
         temperature=0.9,
-    ).strip()
+    )
+    return _sanitize_mutator_output(raw)
+
+
+_CODE_FENCE = re.compile(r"```(?:markdown|md)?\s*\n(.*?)```", re.DOTALL)
+_FIRST_HEADING = re.compile(r"^#\s+Spark persona", re.MULTILINE)
+
+
+def _sanitize_mutator_output(text: str) -> str:
+    """Extract the actual persona spec markdown from a mutator response.
+
+    The mutator system prompt asks for raw markdown only, but reasoning
+    models sometimes emit chain-of-thought analysis followed by the spec
+    inside a code fence. Strip those wrappers so persona.vN.md is a
+    clean spec, not a transcript of the model thinking through the task.
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+    # First, prefer a fenced markdown block if one exists
+    fence = _CODE_FENCE.search(raw)
+    if fence:
+        candidate = fence.group(1).strip()
+        if _FIRST_HEADING.search(candidate):
+            return candidate
+    # Otherwise, find the first '# Spark persona' heading and return from there
+    match = _FIRST_HEADING.search(raw)
+    if match:
+        return raw[match.start():].strip()
+    # Last resort: return the raw text and let the scorer / reviewer catch it
+    return raw
 
 
 def main() -> int:
