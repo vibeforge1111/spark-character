@@ -5,6 +5,11 @@ from .audit_miner import (
     AuditFindings,
     AuditMiner,
 )
+from .chip_context import (
+    attach_chip_context,
+    chip_context_for,
+    known_chip_keys,
+)
 from .chip_loader import (
     PersonalityChip,
     load_chip,
@@ -91,6 +96,9 @@ __all__ = [
     "Probe",
     "ProbeResult",
     "ProviderSpec",
+    "attach_chip_context",
+    "chip_context_for",
+    "known_chip_keys",
     "load_chip",
     "load_chip_by_id",
     "persona_from_chip",

@@ -44,6 +44,7 @@ from spark_character import (  # noqa: E402
     AuditMiner,
     PersonaSpec,
     ProviderSpec,
+    attach_chip_context,
     call_provider,
     generate,
     run_deep_probe,
@@ -126,12 +127,18 @@ def score_all_tiers(
     persona: PersonaSpec,
     *,
     include_deeper: bool = False,
+    chip_load: list[str] | None = None,
 ) -> dict:
     """Run T1+T2 over PROMPTS and T3 over PROBES. Returns aggregated dict.
 
     When include_deeper=True, also runs T6 emotional attunement,
     T7 memory coherence, and T8 initiative probes. ~3x more LLM
     calls per persona scored.
+
+    When chip_load is a list of chip keys (e.g. ["xcontent", "startup-yc"]),
+    each prompt is wrapped with that chip context before generation, so
+    candidates are scored on the path users actually experience in
+    production rather than the bare-LLM path.
     """
     t1_means: list[float] = []
     t2_scores: list[float] = []
@@ -146,9 +153,11 @@ def score_all_tiers(
     failures_t7: list[tuple[str, float]] = []
     failures_t8: list[tuple[str, float]] = []
 
+    chip_keys = list(chip_load or [])
     for prompt in PROMPTS:
         try:
-            result = generate(prompt, provider=provider, persona=persona)
+            wrapped = attach_chip_context(prompt, chip_keys) if chip_keys else prompt
+            result = generate(wrapped, provider=provider, persona=persona)
             t1 = score_persona(result.final)
             t1_means.append(t1.mean)
             if t1.mean < 1.0:
@@ -336,6 +345,15 @@ def main() -> int:
         default=200,
         help="How many recent SIB outbound rows to mine when --sib-home is set.",
     )
+    parser.add_argument(
+        "--chip-load",
+        default="",
+        help="Comma-separated chip keys whose context to inject into eval "
+        "prompts (e.g. 'xcontent,startup-yc'). When set, candidates are "
+        "scored on the chip-loaded path users actually experience in "
+        "production, not the bare-LLM path. Closes the 88-em-dash gap "
+        "the audit miner found.",
+    )
     args = parser.parse_args()
 
     weights = tuple(float(x) for x in args.weights.split(","))
@@ -349,7 +367,8 @@ def main() -> int:
     tier_label = "T1+T2+T3+T6+T7+T8" if args.include_deeper else "T1+T2+T3"
     print(f"[baseline v{n}] scoring {tier_label}...")
     t0 = time.time()
-    baseline_scores = score_all_tiers(provider, baseline, include_deeper=args.include_deeper)
+    chip_load = [c.strip() for c in (args.chip_load or "").split(",") if c.strip()]
+    baseline_scores = score_all_tiers(provider, baseline, include_deeper=args.include_deeper, chip_load=chip_load)
     baseline_composite = composite(baseline_scores, weights)
     print(_format_score_line(f"baseline v{n}", baseline_scores, baseline_composite, time.time() - t0))
 
@@ -381,7 +400,7 @@ def main() -> int:
         try:
             text = mutate_persona(provider, baseline, weaknesses)
             cand = PersonaSpec(version=f"cand-{i + 1}", text=text)
-            scores = score_all_tiers(provider, cand, include_deeper=args.include_deeper)
+            scores = score_all_tiers(provider, cand, include_deeper=args.include_deeper, chip_load=chip_load)
             comp = composite(scores, weights)
             candidates.append({"index": i + 1, "text": text, "scores": scores, "composite": comp})
             print(_format_score_line(f"candidate {i + 1}", scores, comp, time.time() - t0))
