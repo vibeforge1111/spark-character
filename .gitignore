@@ -17,10 +17,8 @@ env/
 .coverage
 htmlcov/
 
-# eval outputs
-evals/_pulse_last.json
-evals/_*.json
-evals/_*.log
+# eval outputs (any file starting with underscore in evals/)
+evals/_*
 
 # editor
 .vscode/
