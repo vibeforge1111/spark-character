@@ -106,6 +106,11 @@ from .stability import (
     StabilityScenario,
     run_stability_scenario,
 )
+from .output_sanitizer import (
+    EM_DASH_FAMILY,
+    replace_em_dashes,
+    sanitize_voice_output,
+)
 from .voice_judge import (
     DistinctivenessScore,
     score_distinctiveness,
@@ -124,6 +129,9 @@ __all__ = [
     "call_codex",
     "codex_available",
     "DistinctivenessScore",
+    "EM_DASH_FAMILY",
+    "replace_em_dashes",
+    "sanitize_voice_output",
     "GenerationResult",
     "PROBES",
     "PersonaScore",
