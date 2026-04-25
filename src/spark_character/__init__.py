@@ -1,5 +1,10 @@
 """spark-character: provider-agnostic voice and character for Spark agents."""
 
+from .audit_miner import (
+    AuditFailure,
+    AuditFindings,
+    AuditMiner,
+)
 from .codex_provider import (
     CodexSpec,
     call_codex,
@@ -54,6 +59,9 @@ from .voice_judge import (
 __version__ = "0.3.0"
 
 __all__ = [
+    "AuditFailure",
+    "AuditFindings",
+    "AuditMiner",
     "CodexSpec",
     "CriticSpec",
     "CritiqueResult",
