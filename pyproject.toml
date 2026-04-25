@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spark-character"
-version = "0.10.0"
+version = "0.11.0"
 description = "The voice and character of Spark agents. Provider-agnostic, evolvable through the self-evolving harness."
 readme = "README.md"
 requires-python = ">=3.10"

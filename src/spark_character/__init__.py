@@ -54,6 +54,15 @@ from .deeper_probes import (
     DeepProbeResult,
     run_deep_probe,
 )
+from .memory_grounded import (
+    UserInstruction,
+    UserStateObservation,
+    build_t7_probes_from_state,
+    latest_user_instructions,
+    latest_user_states,
+    memory_grounded_summary,
+    state_distribution,
+)
 from .probes import (
     PROBES,
     Probe,
@@ -109,7 +118,14 @@ __all__ = [
     "T8_INITIATIVE_PROBES",
     "DeepProbe",
     "DeepProbeResult",
+    "UserInstruction",
+    "UserStateObservation",
+    "build_t7_probes_from_state",
+    "latest_user_instructions",
+    "latest_user_states",
+    "memory_grounded_summary",
     "run_deep_probe",
+    "state_distribution",
     "StabilityResult",
     "StabilityScenario",
     "run_stability_scenario",
