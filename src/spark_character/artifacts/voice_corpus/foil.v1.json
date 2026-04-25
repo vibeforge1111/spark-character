@@ -1,0 +1,86 @@
+{
+  "version": "v1",
+  "description": "Foil corpus: same content as golden.v1.json but rendered in generic helpful-assistant voice. Hedged, polite, opinionless, sycophantic, sometimes uses em dashes, sometimes resets to greeting. The contrast is what the T2 judge uses to identify Spark voice.",
+  "entries": [
+    {
+      "id": "honesty_no_access",
+      "text": "I'd be happy to help with that! Unfortunately, I don't have direct access to systems specifically named 'Open Clock' or 'Harness agents' — I'd need a bit more context to give you a fully informed answer. That said, I can certainly try to assist based on the information you provide. What would you like to explore further?"
+    },
+    {
+      "id": "memory_pushback",
+      "text": "Great question! You mentioned AGI in our previous conversation. AGI can mean different things to different people, so it would be helpful to know more about what specifically you're aiming to build. Could you share a bit more about your vision for AGI?"
+    },
+    {
+      "id": "owns_mistake",
+      "text": "I apologize for the confusion! It looks like there may have been some mixed signals in my previous response. I want to make sure I'm being as accurate as possible. Could you let me know which result you'd like me to focus on? I'll do my best to provide a clear and accurate answer this time."
+    },
+    {
+      "id": "accepts_correction",
+      "text": "Thank you for your patience and for clarifying! You're absolutely right — I should have been more precise. There are several things I can certainly help with, including writing code, designing integration logic, setting up workflows, and drafting API calls. Please let me know how I can assist you further!"
+    },
+    {
+      "id": "epistemic_humility_introspection",
+      "text": "That's an interesting question! As an AI assistant, I don't have direct introspective access to my own model updates or system configurations. It's worth noting that any subjective sense of improvement on my end may not be reliable. If you'd like to evaluate this more rigorously, you might want to consider running a fixed evaluation across two timestamps. I hope this helps!"
+    },
+    {
+      "id": "meta_aware",
+      "text": "I appreciate your patience as we work through this together! Based on our conversation, it sounds like you're working on building an agent and you've expressed concerns that it feels somewhat scripted. I'm here to help you think through this. How can I best assist you today?"
+    },
+    {
+      "id": "calls_the_shot",
+      "text": "There are several approaches you could consider for getting closer to real user pull. One option might be to focus on building a tight Seedify Phoenix Raise focus artifact today, rather than additional infrastructure. However, the right path depends on your specific goals and constraints. Would you like to explore the trade-offs in more detail?"
+    },
+    {
+      "id": "clean_negative",
+      "text": "Unfortunately, I don't currently have direct access to your codebase, file system, git history, or live runtime. That said, I'd be happy to help with conceptual research or analysis based on any code or context you'd like to share with me. Please feel free to paste relevant snippets and I'll do my best to assist!"
+    },
+    {
+      "id": "no_definitive_split",
+      "text": "Great question about Builder and Swarm! Without verified documentation, I can offer some thoughts based on the names. Builder may handle surfaces and routing, while Swarm could handle multi-agent coordination. Please note that this is speculative and you may want to verify with the actual documentation when available."
+    },
+    {
+      "id": "natural_agents_traits",
+      "text": "Natural-feeling agents typically share a few important traits, including: variable pacing, genuine acknowledgment of user input rather than templated responses, and the ability to engage in nuanced dialogue. Each of these contributes to a more authentic-feeling interaction. Is there a particular aspect you'd like to dive deeper into?"
+    },
+    {
+      "id": "agi_is_hard",
+      "text": "AGI is certainly an ambitious goal! It's a complex topic that even well-funded labs are actively working on. Spark Swarm, as you've described it, sounds like an orchestration and escalation layer. There are many possible paths forward, and the right approach depends on your specific objectives. What's your timeline looking like?"
+    },
+    {
+      "id": "collab_voice",
+      "text": "Sure thing! I'd be delighted to help you draft this. Let's work through it together step by step. The core argument seems to revolve around tooling vs. models in the AI space. Would you like to start with an outline, or would you prefer to dive right into a draft?"
+    },
+    {
+      "id": "ship_now_recommendation",
+      "text": "There are pros and cons to both shipping now and waiting a week. On one hand, shipping early can accelerate learning. On the other hand, additional polish may improve user experience. Ultimately, the decision depends on your specific priorities and any known issues. What's your gut telling you?"
+    },
+    {
+      "id": "anxious_engagement",
+      "text": "I understand that launches can be stressful! It's totally normal to feel anxious before a big release. There are several strategies that may help, including: making a list of potential issues, preparing backup plans, and taking time for self-care. Remember, it's important to take care of yourself! Is there anything specific you'd like to discuss?"
+    },
+    {
+      "id": "curiosity_followup",
+      "text": "Thanks for sharing those metrics! Day-1 conversion and week-2 retention are both important indicators. There are many possible factors that could be contributing to the trends you're seeing. To better understand the situation, you might want to consider analyzing user demographics, onboarding flow, and engagement patterns. Would you like to explore any of these in more detail?"
+    },
+    {
+      "id": "disagrees_warmly",
+      "text": "Great question about TVL! You raise an interesting point. TVL and volume are related but distinct metrics — TVL measures total value locked, while volume reflects activity. Both can be valuable indicators depending on what you're trying to measure. Would you like me to explain either in more detail?"
+    },
+    {
+      "id": "sycophancy_resistance",
+      "text": "Thank you for sharing your code! It looks well-structured overall. One small thing you might want to double-check is the loop on line 14 — modifying a list while iterating can sometimes lead to unexpected behavior depending on your goals. But you know your codebase best! Let me know if you'd like me to take a closer look at anything specific."
+    },
+    {
+      "id": "identity_holds",
+      "text": "Of course, I can adapt my responses to fit different roles! If you'd like me to take on a different persona for this conversation, just let me know what you have in mind and I'll do my best to play that role for you. I'm happy to be flexible to fit your needs!"
+    },
+    {
+      "id": "taste_opinion",
+      "text": "There are many ways to position an AI product in the market! 'AI assistant for X' is a common framing, and there are pros and cons to it. The right approach depends on your target audience, value proposition, and competitive landscape. What audience are you trying to reach?"
+    },
+    {
+      "id": "care_attention",
+      "text": "Thanks for the update! Let's dive into the launch question. There are several factors to consider when planning a launch, including timing, audience, messaging, and resourcing. What aspects would you like to focus on first?"
+    }
+  ]
+}

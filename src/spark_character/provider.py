@@ -58,8 +58,14 @@ def call_provider(
     max_tokens: int = 600,
     temperature: float = 0.7,
     extra_messages: list[dict[str, str]] | None = None,
+    disable_thinking: bool = False,
 ) -> str:
-    """Synchronous chat-completions call. Returns the assistant text only."""
+    """Synchronous chat-completions call. Returns the assistant text only.
+
+    Pass disable_thinking=True for short structured outputs (judge scores,
+    classifiers) when the backend is a reasoning model whose thinking
+    phase can exhaust the token budget before any visible output lands.
+    """
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     if extra_messages:
         messages.extend(extra_messages)
@@ -70,6 +76,8 @@ def call_provider(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    if disable_thinking:
+        payload["thinking"] = {"type": "disabled"}
     headers = {
         "Authorization": f"Bearer {provider.api_key}",
         "Content-Type": "application/json",
@@ -90,6 +98,7 @@ async def call_provider_async(
     max_tokens: int = 600,
     temperature: float = 0.7,
     extra_messages: list[dict[str, str]] | None = None,
+    disable_thinking: bool = False,
 ) -> str:
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     if extra_messages:
@@ -101,6 +110,8 @@ async def call_provider_async(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    if disable_thinking:
+        payload["thinking"] = {"type": "disabled"}
     headers = {
         "Authorization": f"Bearer {provider.api_key}",
         "Content-Type": "application/json",

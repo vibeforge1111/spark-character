@@ -24,19 +24,34 @@ from .provider import (
     call_provider,
     call_provider_async,
 )
+from .probes import (
+    PROBES,
+    Probe,
+    ProbeResult,
+    run_probe,
+)
 from .scoring import (
     PersonaScore,
     score_persona,
 )
+from .voice_judge import (
+    DistinctivenessScore,
+    score_distinctiveness,
+    score_distinctiveness_async,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "CriticSpec",
     "CritiqueResult",
+    "DistinctivenessScore",
     "GenerationResult",
+    "PROBES",
     "PersonaScore",
     "PersonaSpec",
+    "Probe",
+    "ProbeResult",
     "ProviderSpec",
     "call_provider",
     "call_provider_async",
@@ -49,6 +64,9 @@ __all__ = [
     "load_critic",
     "load_persona",
     "load_persona_from_path",
+    "run_probe",
+    "score_distinctiveness",
+    "score_distinctiveness_async",
     "score_persona",
     "__version__",
 ]
