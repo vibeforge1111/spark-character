@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spark-character"
-version = "0.7.0"
+version = "0.8.0"
 description = "The voice and character of Spark agents. Provider-agnostic, evolvable through the self-evolving harness."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,7 +27,12 @@ Homepage = "https://github.com/vibeforge1111/spark-character"
 where = ["src"]
 
 [tool.setuptools.package-data]
-spark_character = ["artifacts/*.md", "artifacts/voice_corpus/*.json"]
+spark_character = [
+    "artifacts/*.md",
+    "artifacts/*.txt",
+    "artifacts/voice_corpus/*.json",
+    "artifacts/overlays/*.md",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

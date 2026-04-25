@@ -182,6 +182,13 @@ def main() -> int:
     print(f"\n=== T5 cross-provider | persona={persona.version} ===")
     print(f"providers: {[p.name for p in profiles]}  models: {[p.spec.model for p in profiles]}")
     print(f"judge: {judge_profiles[0].name} model={judge.model}\n")
+    # Per-provider persona = base persona + that backend's overlay if any
+    per_provider_persona: dict[str, "type(persona)"] = {}
+    for p in profiles:
+        try:
+            per_provider_persona[p.name] = load_persona(provider_kind=p.name)
+        except Exception:
+            per_provider_persona[p.name] = persona
 
     # Generate per-provider replies
     per_provider: dict[str, list[dict]] = {p.name: [] for p in profiles}
@@ -190,14 +197,15 @@ def main() -> int:
         for p in profiles:
             t0 = time()
             try:
+                p_persona = per_provider_persona.get(p.name, persona)
                 if p.kind == "codex":
                     reply = call_codex(
                         spec=p.spec,
-                        system_prompt=persona.system_prompt,
+                        system_prompt=p_persona.system_prompt,
                         user_prompt=prompt,
                     )
                 else:
-                    reply = generate(prompt, provider=p.spec, persona=persona).final
+                    reply = generate(prompt, provider=p.spec, persona=p_persona).final
                 t1 = score_persona(reply)
                 try:
                     # T2 judge always uses an HTTP backend (judge variable)

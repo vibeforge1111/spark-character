@@ -21,7 +21,7 @@ from .critic import (
     critique_async,
     load_critic,
 )
-from .persona import PersonaSpec, load_persona
+from .persona import PersonaSpec, detect_provider_kind, load_persona
 from .provider import ProviderSpec, call_provider, call_provider_async
 from .scoring import score_persona
 
@@ -55,8 +55,12 @@ def generate(
     Pass tools=[{...}] to attach native tools the backend supports for
     this turn (e.g. [{"type": "web_search", "web_search": {"enable": True}}]
     on Z.AI). The model decides when to call them; the final reply text
-    is returned."""
-    p = persona or load_persona()
+    is returned.
+
+    When persona is None, the active version is loaded with the
+    matching provider overlay automatically (Z.AI, MiniMax, etc.).
+    Pass an explicit persona to override that behavior."""
+    p = persona or load_persona(provider_kind=detect_provider_kind(provider))
     draft = call_provider(
         provider=provider,
         system_prompt=p.system_prompt,
@@ -91,7 +95,7 @@ def generate_with_critique(
     """Generate, then run the critic only if the local scorers flag a
     persona violation in the draft. Set always_critique=True to bypass
     the gate and run the critic on every reply."""
-    p = persona or load_persona()
+    p = persona or load_persona(provider_kind=detect_provider_kind(provider))
     c = critic or load_critic()
     draft = call_provider(
         provider=provider,
@@ -133,7 +137,7 @@ async def generate_async(
     temperature: float = 0.7,
     disable_thinking: bool = True,
 ) -> GenerationResult:
-    p = persona or load_persona()
+    p = persona or load_persona(provider_kind=detect_provider_kind(provider))
     draft = await call_provider_async(
         provider=provider,
         system_prompt=p.system_prompt,
@@ -164,7 +168,7 @@ async def generate_with_critique_async(
     always_critique: bool = False,
     disable_thinking: bool = True,
 ) -> GenerationResult:
-    p = persona or load_persona()
+    p = persona or load_persona(provider_kind=detect_provider_kind(provider))
     c = critic or load_critic()
     draft = await call_provider_async(
         provider=provider,
