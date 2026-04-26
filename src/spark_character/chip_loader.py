@@ -34,6 +34,7 @@ chip is active.
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -92,6 +93,100 @@ DEFAULT_CHIP_LAB_PATHS = (
 )
 
 
+TRAIT_FIELDS = (
+    "openness",
+    "conscientiousness",
+    "extraversion",
+    "agreeableness",
+    "neuroticism",
+)
+EMOTIONAL_PROFILE_SCORE_FIELDS = (
+    "self_awareness",
+    "self_regulation",
+    "social_awareness",
+)
+TOP_LEVEL_LIST_FIELDS = (
+    "vulnerabilities",
+    "strengths",
+    "anti_patterns",
+)
+TOP_LEVEL_DICT_FIELDS = (
+    "adaptive",
+)
+
+
+def _require_mapping(value: Any, field_name: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"Personality chip field {field_name} must be a mapping.")
+    return value
+
+
+def _validate_score(value: Any, field_name: str) -> None:
+    if isinstance(value, bool):
+        raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].") from exc
+    if not math.isfinite(number) or number < 0.0 or number > 1.0:
+        raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].")
+
+
+def validate_chip_yaml_spec(spec: Any) -> dict[str, Any]:
+    """Validate the minimal chip-lab YAML shape consumed by spark-character."""
+    root = _require_mapping(spec, "<root>")
+    schema = root.get("schema", "spark-personality-chip.v1")
+    if not isinstance(schema, str) or not schema.strip():
+        raise ValueError("Personality chip field schema must be a non-empty string.")
+
+    identity = _require_mapping(root.get("identity"), "identity")
+    for key in ("id", "name"):
+        if not isinstance(identity.get(key), str) or not identity.get(key, "").strip():
+            raise ValueError(f"Personality chip field identity.{key} must be a non-empty string.")
+    for key in ("archetype", "voice_signature", "tagline"):
+        if key in identity and identity[key] is not None and not isinstance(identity[key], str):
+            raise ValueError(f"Personality chip field identity.{key} must be a string.")
+
+    traits = _require_mapping(root.get("traits", {}), "traits")
+    for key in TRAIT_FIELDS:
+        if key in traits:
+            _validate_score(traits[key], f"traits.{key}")
+
+    emotional_profile = _require_mapping(root.get("emotional_profile", {}), "emotional_profile")
+    for key in EMOTIONAL_PROFILE_SCORE_FIELDS:
+        if key in emotional_profile:
+            _validate_score(emotional_profile[key], f"emotional_profile.{key}")
+    if "empathy_style" in emotional_profile and not isinstance(emotional_profile["empathy_style"], str):
+        raise ValueError("Personality chip field emotional_profile.empathy_style must be a string.")
+    emotional_range = _require_mapping(emotional_profile.get("emotional_range", {}), "emotional_profile.emotional_range")
+    for key, value in emotional_range.items():
+        _validate_score(value, f"emotional_profile.emotional_range.{key}")
+    triggers = _require_mapping(emotional_profile.get("triggers", {}), "emotional_profile.triggers")
+    for key, value in triggers.items():
+        if not isinstance(value, list):
+            raise ValueError(f"Personality chip field emotional_profile.triggers.{key} must be a list.")
+
+    preferences = _require_mapping(root.get("preferences", {}), "preferences")
+    for key in ("likes", "dislikes"):
+        if key in preferences and not isinstance(preferences[key], list):
+            raise ValueError(f"Personality chip field preferences.{key} must be a list.")
+    for key in ("communication", "decision_making"):
+        if key in preferences and not isinstance(preferences[key], dict):
+            raise ValueError(f"Personality chip field preferences.{key} must be a mapping.")
+
+    safety = _require_mapping(root.get("safety", {}), "safety")
+    if "harm_avoidance" in safety and not isinstance(safety["harm_avoidance"], list):
+        raise ValueError("Personality chip field safety.harm_avoidance must be a list.")
+
+    for key in TOP_LEVEL_LIST_FIELDS:
+        if key in root and not isinstance(root[key], list):
+            raise ValueError(f"Personality chip field {key} must be a list.")
+    for key in TOP_LEVEL_DICT_FIELDS:
+        if key in root and not isinstance(root[key], dict):
+            raise ValueError(f"Personality chip field {key} must be a mapping.")
+    return root
+
+
 def _coerce_lab_chip(lab_chip: Any) -> PersonalityChip:
     """Convert a personality_engine.PersonalityChip into our local
     dataclass so callers always see one shape."""
@@ -129,6 +224,7 @@ def _coerce_yaml_dict(spec: dict) -> PersonalityChip:
     """Build PersonalityChip from a raw yaml-loaded dict using the
     chip lab's nesting conventions: identity.*, traits.*, emotional_profile.*,
     preferences.*, etc."""
+    spec = validate_chip_yaml_spec(spec)
     identity = spec.get("identity") or {}
     traits = spec.get("traits") or {}
     emo = spec.get("emotional_profile") or {}
@@ -181,7 +277,7 @@ def load_chip(path: str | Path) -> PersonalityChip:
     import yaml  # type: ignore
     with p.open("r", encoding="utf-8") as f:
         spec = yaml.safe_load(f) or {}
-    return _coerce_yaml_dict(spec)
+    return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
 
 
 def load_chip_by_id(

@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .chip_loader import PersonalityChip
+from .chip_loader import PersonalityChip, validate_chip_yaml_spec
 
 DEFAULT_LAB_PATH = Path(os.path.expanduser(
     "~/Desktop/spark-personality-chip-labs/personalities"
@@ -87,7 +87,7 @@ def promote_evolved_persona_to_chip_lab(
     base_spec: dict[str, Any] = {}
     if base_yaml_path.exists():
         try:
-            base_spec = yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {}
+            base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
         except Exception:
             base_spec = {}
 
