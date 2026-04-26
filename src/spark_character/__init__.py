@@ -35,6 +35,7 @@ from .persona import (
     load_persona,
     load_persona_from_path,
     load_surface_overlay,
+    set_latest_persona_version,
 )
 from .pipeline import (
     GenerationResult,
@@ -159,6 +160,7 @@ __all__ = [
     "load_persona",
     "load_persona_from_path",
     "load_surface_overlay",
+    "set_latest_persona_version",
     "persona_from_chip",
     "render_chip_to_system_prompt",
     "EMOTIONAL_PROFILE_FIELDS",

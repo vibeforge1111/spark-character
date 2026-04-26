@@ -6,13 +6,19 @@ that file to evolve voice; everything else reads from it.
 
 from __future__ import annotations
 
+import json
+import os
+import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
 OVERLAYS_DIR = ARTIFACTS_DIR / "overlays"
 LATEST_POINTER = ARTIFACTS_DIR / "persona.latest.txt"
+POINTER_CHANGE_LOG = ARTIFACTS_DIR / "persona.pointer.log"
 DEFAULT_PERSONA_VERSION = "v1"
+PERSONA_VERSION_PATTERN = re.compile(r"^v[1-9][0-9]*$")
 
 
 @dataclass(frozen=True)
@@ -67,6 +73,53 @@ def detect_provider_kind(provider) -> str | None:
     return None
 
 
+def validate_persona_version(version: str) -> str:
+    value = str(version or "").strip()
+    if not PERSONA_VERSION_PATTERN.fullmatch(value):
+        raise ValueError("Persona version must match vN, for example v8.")
+    return value
+
+
+def protect_latest_pointer(path: Path = LATEST_POINTER) -> None:
+    if path.exists():
+        os.chmod(path, 0o444)
+
+
+def set_latest_persona_version(
+    version: str,
+    *,
+    actor: str = "spark-character",
+    reason: str = "",
+    pointer_path: Path = LATEST_POINTER,
+    log_path: Path = POINTER_CHANGE_LOG,
+    artifacts_dir: Path = ARTIFACTS_DIR,
+) -> None:
+    """Update persona.latest.txt through a validated, logged write path."""
+    resolved = validate_persona_version(version)
+    artifact_path = artifacts_dir / f"persona.{resolved}.md"
+    if not artifact_path.exists():
+        raise FileNotFoundError(f"Persona artifact not found: {artifact_path}")
+
+    previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    if pointer_path.exists():
+        os.chmod(pointer_path, 0o666)
+    temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
+    temp_path.write_text(f"{resolved}\n", encoding="utf-8")
+    os.replace(temp_path, pointer_path)
+    protect_latest_pointer(pointer_path)
+
+    record = {
+        "changed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "actor": actor,
+        "reason": reason,
+        "previous": previous or None,
+        "current": resolved,
+    }
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
 def resolve_latest_persona_version() -> str:
     """Resolve which persona version is currently active.
 
@@ -79,7 +132,7 @@ def resolve_latest_persona_version() -> str:
     if LATEST_POINTER.exists():
         text = LATEST_POINTER.read_text(encoding="utf-8").strip()
         if text:
-            return text
+            return validate_persona_version(text)
     versions: list[int] = []
     for path in ARTIFACTS_DIR.glob("persona.v*.md"):
         try:

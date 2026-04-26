@@ -52,7 +52,7 @@ from spark_character import (  # noqa: E402
     score_distinctiveness,
     score_persona,
 )
-from spark_character.persona import ARTIFACTS_DIR  # noqa: E402
+from spark_character.persona import ARTIFACTS_DIR, set_latest_persona_version  # noqa: E402
 
 PROMPTS = [
     "List three things I should focus on as a founder this week.",
@@ -440,7 +440,11 @@ def main() -> int:
         new_n = n + 1
         new_path = ARTIFACTS_DIR / f"persona.v{new_n}.md"
         new_path.write_text(winner["text"], encoding="utf-8")
-        (ARTIFACTS_DIR / "persona.latest.txt").write_text(f"v{new_n}\n", encoding="utf-8")
+        set_latest_persona_version(
+            f"v{new_n}",
+            actor="evals/evolve_persona.py",
+            reason=promote_reason,
+        )
         print(f"\nPROMOTED: candidate {winner['index']} -> {new_path.name}")
         print(f"  reason: {promote_reason}")
         # Sidecar promotion to spark-personality-chip-labs registry

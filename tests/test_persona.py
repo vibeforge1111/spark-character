@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from spark_character import load_critic, load_persona
+import json
+import stat
+from pathlib import Path
+
+import pytest
+
+from spark_character import load_critic, load_persona, set_latest_persona_version
+import spark_character.persona as persona_module
 from spark_character.scoring import score_persona
 
 
@@ -47,3 +54,40 @@ def test_persona_text_has_no_em_dash() -> None:
     score = score_persona(persona.system_prompt)
     assert score.p1_em_dash == 1.0
     assert score.p4_lead == 1.0
+
+
+def test_latest_persona_pointer_rejects_malformed_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pointer = tmp_path / "persona.latest.txt"
+    pointer.write_text("../secret\n", encoding="utf-8")
+    monkeypatch.setattr(persona_module, "LATEST_POINTER", pointer)
+    monkeypatch.setattr(persona_module, "ARTIFACTS_DIR", tmp_path)
+
+    with pytest.raises(ValueError, match="vN"):
+        persona_module.resolve_latest_persona_version()
+
+
+def test_set_latest_persona_version_logs_and_protects_pointer(tmp_path: Path) -> None:
+    (tmp_path / "persona.v9.md").write_text("Persona v9", encoding="utf-8")
+    pointer = tmp_path / "persona.latest.txt"
+    log_path = tmp_path / "persona.pointer.log"
+
+    set_latest_persona_version(
+        "v9",
+        actor="test",
+        reason="promotion",
+        pointer_path=pointer,
+        log_path=log_path,
+        artifacts_dir=tmp_path,
+    )
+
+    assert pointer.read_text(encoding="utf-8") == "v9\n"
+    assert not (pointer.stat().st_mode & stat.S_IWUSR)
+    record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert record["actor"] == "test"
+    assert record["reason"] == "promotion"
+    assert record["current"] == "v9"
+
+
+def test_set_latest_persona_version_requires_existing_artifact(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        set_latest_persona_version("v9", pointer_path=tmp_path / "persona.latest.txt", artifacts_dir=tmp_path)
