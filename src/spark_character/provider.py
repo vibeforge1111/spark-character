@@ -14,8 +14,24 @@ import os
 import re
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
+
+
+ALLOWED_PROVIDER_HOSTS = frozenset(
+    {
+        "api.z.ai",
+        "api.minimax.io",
+        "api.openai.com",
+        "api.anthropic.com",
+        "api.groq.com",
+        "api.together.xyz",
+        "localhost",
+        "127.0.0.1",
+        "::1",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -41,14 +57,26 @@ class ProviderSpec:
                 f"Missing API key: env var {api_key_env} is not set."
             )
         return cls(
-            base_url=os.environ.get(base_url_env, default_base_url),
+            base_url=validate_provider_base_url(os.environ.get(base_url_env, default_base_url)),
             model=os.environ.get(model_env, default_model),
             api_key=api_key,
         )
 
 
+def validate_provider_base_url(base_url: str) -> str:
+    parsed = urlparse(str(base_url).strip())
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" and host not in {"localhost", "127.0.0.1", "::1"}:
+        raise RuntimeError("Provider base URL must use HTTPS.")
+    if not host or host not in ALLOWED_PROVIDER_HOSTS:
+        allowed = ", ".join(sorted(ALLOWED_PROVIDER_HOSTS))
+        raise RuntimeError(f"Provider base URL host is not allowed: {host or '<missing>'}. Allowed hosts: {allowed}.")
+    return str(base_url).strip()
+
+
 def _join_url(base_url: str, path_name: str) -> str:
-    return f"{base_url.rstrip('/')}/{path_name.lstrip('/')}"
+    safe_base_url = validate_provider_base_url(base_url)
+    return f"{safe_base_url.rstrip('/')}/{path_name.lstrip('/')}"
 
 
 def call_provider(

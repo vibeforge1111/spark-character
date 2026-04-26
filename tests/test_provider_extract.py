@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from spark_character.provider import _extract_text, _strip_think_blocks
+import pytest
+
+from spark_character.provider import ProviderSpec, _extract_text, _join_url, _strip_think_blocks, validate_provider_base_url
 
 
 def test_strip_complete_think_block() -> None:
@@ -47,3 +49,28 @@ def test_extract_text_falls_back_to_reasoning_content() -> None:
 def test_extract_text_handles_missing_choices() -> None:
     assert _extract_text({}) == ""
     assert _extract_text({"choices": []}) == ""
+
+
+def test_provider_base_url_requires_allowed_https_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ZAI_API_KEY", "secret")
+    monkeypatch.setenv("ZAI_BASE_URL", "https://evil.example/v1")
+    with pytest.raises(RuntimeError, match="not allowed"):
+        ProviderSpec.from_env()
+
+
+def test_provider_base_url_rejects_plain_http_for_remote_host() -> None:
+    with pytest.raises(RuntimeError, match="HTTPS"):
+        validate_provider_base_url("http://api.z.ai/api/coding/paas/v4/")
+
+
+def test_provider_base_url_allows_known_https_provider() -> None:
+    assert validate_provider_base_url("https://api.z.ai/api/coding/paas/v4/") == "https://api.z.ai/api/coding/paas/v4/"
+
+
+def test_provider_base_url_allows_localhost_for_local_openai_compatible_servers() -> None:
+    assert validate_provider_base_url("http://127.0.0.1:11434/v1") == "http://127.0.0.1:11434/v1"
+
+
+def test_join_url_validates_direct_provider_spec_base_url() -> None:
+    with pytest.raises(RuntimeError, match="not allowed"):
+        _join_url("https://evil.example/v1", "chat/completions")
