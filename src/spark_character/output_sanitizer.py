@@ -86,8 +86,8 @@ def rewrite_spawner_surface_standalone_question(text: str) -> str:
         "or Telegram relay messaging?"
     )
     out = re.sub(
-        r"\n?\s*[-*]?\s*Are you thinking this runs locally as a standalone page,\s*"
-        r"or lives inside the existing Spawner UI routes\?\s*$",
+        r"\n?\s*[-*]?\s*Are you thinking this (?:runs locally as|should run locally as|should be) "
+        r"a standalone (?:page|app|tool),\s*or lives? inside the existing Spawner UI routes\?\s*$",
         replacement,
         text,
         flags=re.IGNORECASE,
