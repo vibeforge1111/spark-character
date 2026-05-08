@@ -5,7 +5,7 @@ kind = "runtime"
 plane = "identity"
 description = "Provider-agnostic Spark persona, voice consistency, scoring, and opt-in evolution runtime."
 homepage = "https://github.com/vibeforge1111/spark-character"
-license = "AGPL-3.0-only"
+license = "MIT"
 
 [runtime]
 kind = "python"

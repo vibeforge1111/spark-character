@@ -228,4 +228,10 @@ tests/
 
 ## License
 
-GNU Affero General Public License v3.0 only.
+MIT. See [LICENSE](./LICENSE).
+
+Spark Swarm is AGPL-licensed. Other Spark repos are MIT unless their
+LICENSE file says otherwise. Spark Pro hosted services, private corpuses,
+brand assets, deployment secrets, and Pro drops are not included in
+open-source licenses. Pro drops do not grant redistribution rights unless
+a separate written license says so.
