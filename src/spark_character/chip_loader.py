@@ -311,7 +311,9 @@ def load_chip_by_id(
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
-            except recoverable_load_errors:
+            except recoverable_load_errors as exc:
+                import logging
+                logging.warning("spark-character: failed to load personality chip %s: %s", entry.name, exc)
                 continue
             if chip.id == chip_id:
                 return chip
