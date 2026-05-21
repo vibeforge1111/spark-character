@@ -48,8 +48,6 @@ flowchart TD
 
 Full architectural detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-Voice and character boundary notes: [docs/VOICE_CHARACTER_CONNECTIONS_2026-05-09.md](docs/VOICE_CHARACTER_CONNECTIONS_2026-05-09.md)
-
 Open gaps and planned evolutions: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## Install
