@@ -46,7 +46,7 @@ try:  # optional dependency
     from personality_engine.loader import load_personality as _lab_load_personality  # type: ignore
     from personality_engine.schema import PersonalityChip as _LabPersonalityChip  # type: ignore
     _LAB_AVAILABLE = True
-except Exception:
+except ImportError:
     _LAB_AVAILABLE = False
     _lab_load_personality = None
     _LabPersonalityChip = None
