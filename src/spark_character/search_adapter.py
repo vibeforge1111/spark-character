@@ -99,7 +99,7 @@ def search_results_for(
     try:
         results = fn(query)
         return results[:max_results]
-    except Exception:
+    except (OSError, ValueError):
         return []
 
 
@@ -190,7 +190,7 @@ def _parse_duckduckgo_html(text: str) -> list[SearchResult]:
                 qs = parse_qs(parsed.query)
                 if qs.get("uddg"):
                     url = unquote(qs["uddg"][0])
-            except Exception:
+            except (ValueError, KeyError):
                 pass
         if not clean_title and not clean_snippet:
             continue
