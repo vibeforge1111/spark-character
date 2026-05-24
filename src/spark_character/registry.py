@@ -96,8 +96,8 @@ def promote_evolved_persona_to_chip_lab(
     if base_yaml_path.exists():
         try:
             base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
-        except (OSError, ValueError, yaml.YAMLError):
-            base_spec = {}
+        except (yaml.YAMLError, ValueError, OSError) as exc:
+            raise RuntimeError(f"Cannot read base chip {base_yaml_path}: {exc}") from exc
 
     # Carry everything from the base chip forward, then mark this as an
     # evolved variant and embed the new voice rules.
