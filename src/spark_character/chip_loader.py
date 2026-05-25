@@ -92,12 +92,16 @@ class PersonalityChip:
     _raw: dict = field(default_factory=dict, repr=False)
 
 
-DEFAULT_CHIP_LAB_PATHS = (
-    Path(os.path.expanduser("~/.spark/modules/spark-personality-chip-labs/source/personalities")),
-    Path(os.path.expanduser("~/.spark/spark-personality-chip-labs/personalities")),
-    Path(os.path.expanduser("~/Desktop/spark-personality-chip-labs/personalities")),
-    Path("./personalities"),
-    Path(os.path.expanduser("~/.spark/personalities")),
+DEFAULT_CHIP_LAB_PATHS = tuple(
+    p for p in (
+        Path(os.path.expanduser('~/.spark/modules/spark-personality-chip-labs/source/personalities')),
+        Path(os.path.expanduser('~/.spark/spark-personality-chip-labs/personalities')),
+        Path(os.path.expanduser('~/Desktop/spark-personality-chip-labs/personalities')),
+        Path('./personalities'),
+        Path(os.path.expanduser('~/.spark/personalities')),
+    )
+    if p == Path('./personalities') or p.exists()
+)
 )
 
 
