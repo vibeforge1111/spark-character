@@ -46,7 +46,7 @@ try:  # optional dependency
     from personality_engine.loader import load_personality as _lab_load_personality  # type: ignore
     from personality_engine.schema import PersonalityChip as _LabPersonalityChip  # type: ignore
     _LAB_AVAILABLE = True
-except Exception:
+except ImportError:
     _LAB_AVAILABLE = False
     _lab_load_personality = None
     _LabPersonalityChip = None
@@ -298,7 +298,7 @@ def load_chip_by_id(
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
-            except Exception:
+            except (OSError, ValueError):
                 continue
             if chip.id == chip_id:
                 return chip
