@@ -311,7 +311,11 @@ def load_chip_by_id(
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
+<<<<<<< HEAD
             except recoverable_load_errors:
+=======
+            except (OSError, ValueError):
+>>>>>>> 4b11a82 ([spark-compete] fix: narrow bare except Exception to specific types in chip_loader and registry)
                 continue
             if chip.id == chip_id:
                 return chip
