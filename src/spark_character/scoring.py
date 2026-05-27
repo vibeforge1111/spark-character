@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-EM_DASH = "\u2014"
+from .output_sanitizer import EM_DASH_FAMILY
 
 PLUMBING_TERMS = (
     "spark researcher",
@@ -116,7 +116,7 @@ class PersonaScore:
 
 
 def score_persona(text: str) -> PersonaScore:
-    p1 = 0.0 if EM_DASH in text else 1.0
+    p1 = 0.0 if any(ch in text for ch in EM_DASH_FAMILY) else 1.0
     plumbing_hits = tuple(sorted({m.lower() for m in PLUMBING_PATTERN.findall(text)}))
     p2 = max(0.0, 1.0 - 0.25 * len(plumbing_hits)) if plumbing_hits else 1.0
     p3 = 0.0 if RESET_PATTERN.search(text) else 1.0
