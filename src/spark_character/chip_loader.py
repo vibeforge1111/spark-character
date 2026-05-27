@@ -288,6 +288,9 @@ def load_chip_by_id(
     search_paths: list[Path] | None = None,
 ) -> PersonalityChip:
     """Find a personality chip by its identity.id across known paths."""
+    import yaml  # type: ignore
+
+    recoverable_load_errors = (OSError, ValueError, yaml.YAMLError)
     paths = search_paths or list(DEFAULT_CHIP_LAB_PATHS)
     for base in paths:
         if not base.exists():
@@ -298,7 +301,7 @@ def load_chip_by_id(
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
-            except Exception:
+            except recoverable_load_errors:
                 continue
             if chip.id == chip_id:
                 return chip

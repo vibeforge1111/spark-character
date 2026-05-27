@@ -119,3 +119,30 @@ def test_rendered_chip_prompt_prioritizes_local_list_references(tmp_path: Path, 
     assert "numbered or listed option" in prompt
     assert "most recent list" in prompt
     assert "older memory" in prompt
+
+
+def test_load_chip_by_id_skips_malformed_yaml_and_finds_valid_chip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(chip_loader, "_LAB_AVAILABLE", False)
+    monkeypatch.setattr(chip_loader, "_lab_load_personality", None)
+    (tmp_path / "broken.personality.yaml").write_text("identity: [", encoding="utf-8")
+    (tmp_path / "founder-operator.personality.yaml").write_text(VALID_CHIP_YAML, encoding="utf-8")
+
+    chip = chip_loader.load_chip_by_id("founder-operator", search_paths=[tmp_path])
+
+    assert chip.id == "founder-operator"
+
+
+def test_load_chip_by_id_does_not_swallow_unexpected_loader_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "founder-operator.personality.yaml"
+    path.write_text(VALID_CHIP_YAML, encoding="utf-8")
+
+    def broken_loader(_path: Path) -> chip_loader.PersonalityChip:
+        raise RuntimeError("unexpected loader bug")
+
+    monkeypatch.setattr(chip_loader, "load_chip", broken_loader)
+
+    with pytest.raises(RuntimeError, match="unexpected loader bug"):
+        chip_loader.load_chip_by_id("founder-operator", search_paths=[tmp_path])

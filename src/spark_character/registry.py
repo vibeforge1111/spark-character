@@ -88,7 +88,7 @@ def promote_evolved_persona_to_chip_lab(
     if base_yaml_path.exists():
         try:
             base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
-        except Exception:
+        except (OSError, ValueError, yaml.YAMLError):
             base_spec = {}
 
     # Carry everything from the base chip forward, then mark this as an
