@@ -40,7 +40,7 @@ import html
 import re
 from dataclasses import dataclass
 from typing import Callable
-from urllib.parse import quote_plus
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import httpx
 
@@ -99,7 +99,7 @@ def search_results_for(
     try:
         results = fn(query)
         return results[:max_results]
-    except Exception:
+    except (httpx.HTTPError, OSError, ValueError):
         return []
 
 
@@ -185,12 +185,11 @@ def _parse_duckduckgo_html(text: str) -> list[SearchResult]:
         url = raw_url
         if url.startswith("//duckduckgo.com/l/?uddg="):
             try:
-                from urllib.parse import unquote, urlparse, parse_qs
                 parsed = urlparse(url)
                 qs = parse_qs(parsed.query)
                 if qs.get("uddg"):
                     url = unquote(qs["uddg"][0])
-            except Exception:
+            except (ValueError, IndexError):
                 pass
         if not clean_title and not clean_snippet:
             continue

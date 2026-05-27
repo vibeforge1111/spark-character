@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import httpx
+import pytest
+
 from spark_character.search_adapter import (
     SearchResult,
     _parse_duckduckgo_html,
     _strip_tags,
     attach_search_context,
     detect_needs_live_data,
+    search_results_for,
 )
 
 
@@ -91,3 +95,49 @@ def test_parse_duckduckgo_html_minimal() -> None:
     assert results[0].snippet == "A snippet about something"
     assert results[0].url == "https://example.com"
     assert results[1].title == "Second Title"
+
+
+def test_search_results_soft_fails_expected_backend_errors() -> None:
+    def failing_search(_query: str) -> list[SearchResult]:
+        raise httpx.ReadTimeout("search timed out")
+
+    assert search_results_for("current btc price", search_fn=failing_search) == []
+
+
+def test_search_results_surfaces_unexpected_programming_errors() -> None:
+    def broken_search(_query: str) -> list[SearchResult]:
+        raise RuntimeError("programmer bug")
+
+    with pytest.raises(RuntimeError, match="programmer bug"):
+        search_results_for("current btc price", search_fn=broken_search)
+
+
+def test_parse_duckduckgo_redirect_decodes_target_url() -> None:
+    html_text = """
+    <html>
+    <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fsafe">Example</a>
+    <a class="result__snippet">A snippet</a>
+    </html>
+    """
+
+    results = _parse_duckduckgo_html(html_text)
+
+    assert results[0].url == "https://example.com/safe"
+
+
+def test_parse_duckduckgo_malformed_redirect_keeps_raw_url(monkeypatch) -> None:
+    def empty_uddg(_query: str) -> dict[str, list[str]]:
+        return {"uddg": []}
+
+    monkeypatch.setattr("spark_character.search_adapter.parse_qs", empty_uddg)
+    raw_url = "//duckduckgo.com/l/?uddg="
+    html_text = f"""
+    <html>
+    <a class="result__a" href="{raw_url}">Example</a>
+    <a class="result__snippet">A snippet</a>
+    </html>
+    """
+
+    results = _parse_duckduckgo_html(html_text)
+
+    assert results[0].url == raw_url
