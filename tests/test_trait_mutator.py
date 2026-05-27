@@ -2,13 +2,47 @@
 
 from __future__ import annotations
 
-from spark_character import load_chip_by_id
+from pathlib import Path
+
+from spark_character import load_chip
 from spark_character.trait_mutator import (
     _apply_deltas,
     _clamp_dict,
     _parse_trait_response,
     chip_to_yaml_dict,
 )
+
+VALID_MUTATION_CHIP_YAML = """
+schema: spark-personality-chip.v1
+identity:
+  id: founder-operator
+  name: Founder Operator
+  archetype: builder
+traits:
+  openness: 0.72
+  conscientiousness: 0.88
+  extraversion: 0.34
+  agreeableness: 0.42
+  neuroticism: 0.16
+emotional_profile:
+  self_awareness: 0.84
+  self_regulation: 0.86
+  social_awareness: 0.79
+  empathy_style: directive
+  emotional_range:
+    curiosity: 0.91
+    frustration: 0.22
+vulnerabilities:
+  - rushing under pressure
+anti_patterns:
+  - over-explaining simple answers
+"""
+
+
+def load_mutation_test_chip(tmp_path: Path):
+    chip_path = tmp_path / "founder-operator.personality.yaml"
+    chip_path.write_text(VALID_MUTATION_CHIP_YAML, encoding="utf-8")
+    return load_chip(chip_path)
 
 
 def test_clamp_dict_filters_unknown_keys() -> None:
@@ -34,8 +68,8 @@ def test_clamp_dict_drops_zero_deltas() -> None:
     assert out == {}
 
 
-def test_apply_deltas_clamps_to_unit() -> None:
-    chip = load_chip_by_id("founder-operator")
+def test_apply_deltas_clamps_to_unit(tmp_path: Path) -> None:
+    chip = load_mutation_test_chip(tmp_path)
     new_chip = _apply_deltas(
         chip,
         trait_deltas={"agreeableness": -0.50, "neuroticism": 0.10},
@@ -72,8 +106,8 @@ def test_parse_trait_response_returns_empty_on_garbage() -> None:
     assert _parse_trait_response("not json at all") == {}
 
 
-def test_chip_to_yaml_dict_round_trip_preserves_structure() -> None:
-    chip = load_chip_by_id("founder-operator")
+def test_chip_to_yaml_dict_round_trip_preserves_structure(tmp_path: Path) -> None:
+    chip = load_mutation_test_chip(tmp_path)
     spec = chip_to_yaml_dict(chip)
     # required top-level fields
     assert spec["schema"] == "spark-personality-chip.v1"
@@ -86,8 +120,8 @@ def test_chip_to_yaml_dict_round_trip_preserves_structure() -> None:
     assert spec["emotional_profile"]["self_awareness"] == chip.self_awareness
 
 
-def test_chip_to_yaml_dict_after_mutation_reflects_new_values() -> None:
-    chip = load_chip_by_id("founder-operator")
+def test_chip_to_yaml_dict_after_mutation_reflects_new_values(tmp_path: Path) -> None:
+    chip = load_mutation_test_chip(tmp_path)
     new_chip = _apply_deltas(
         chip,
         trait_deltas={"openness": 0.05},
