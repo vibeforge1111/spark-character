@@ -44,6 +44,8 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import httpx
 
+from spark_character.prompt_guard import sanitize_prompt_text
+
 
 _LIVE_DATA_PATTERNS = (
     r"\b(?:current|today's|latest|right now|recent|breaking)\s+",
@@ -125,9 +127,9 @@ def attach_search_context(
         return user_message
     context_lines = ["[Live search results, treat as ground truth for current data]"]
     for i, r in enumerate(results, 1):
-        context_lines.append(f"{i}. {r.title}")
+        context_lines.append(f"{i}. {sanitize_prompt_text(r.title)}")
         if r.snippet:
-            context_lines.append(f"   {r.snippet}")
+            context_lines.append(f"   {sanitize_prompt_text(r.snippet)}")
         if r.url:
             context_lines.append(f"   source: {r.url}")
     context_lines.append("")
