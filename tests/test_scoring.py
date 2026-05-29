@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
+import inspect
+
 from spark_character.scoring import score_persona
 
 
+def test_em_dash_family_imported_from_output_sanitizer():
+    import spark_character.scoring as mod
+    src = inspect.getsource(mod)
+    assert "EM_DASH_FAMILY" in src
+    assert "output_sanitizer" in src
+
+
 def test_em_dash_fails_p1() -> None:
-    score = score_persona("Two chips routing live: \u2014 X Content \u2014 tweet eval.")
+    score = score_persona("Two chips routing: em dash.")
+    assert score.p1_em_dash == 0.0
+
+
+def test_en_dash_fails_p1() -> None:
+    score = score_persona("Revenue grew from 10 to 100 per day.")
     assert score.p1_em_dash == 0.0
 
 
@@ -65,5 +79,5 @@ def test_passed_aggregates_all_axes() -> None:
 
 
 def test_failed_when_any_axis_below_threshold() -> None:
-    score = score_persona("Great question \u2014 how can I help today?")
+    score = score_persona("Great question. How can I help today?")
     assert not score.passed
