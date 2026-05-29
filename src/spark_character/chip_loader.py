@@ -89,7 +89,7 @@ class PersonalityChip:
 
 
 DEFAULT_CHIP_LAB_PATHS = (
-    Path(os.path.expanduser("~/Desktop/spark-personality-chip-labs/personalities")),
+    Path(os.path.expanduser("~/.spark/spark-personality-chip-labs/personalities")),
     Path("./personalities"),
     Path(os.path.expanduser("~/.spark/personalities")),
 )
@@ -99,7 +99,7 @@ def default_chip_lab_paths() -> list[Path]:
     """Return default chip search paths without unavailable desktop-only labs."""
     paths: list[Path] = []
     for path in DEFAULT_CHIP_LAB_PATHS:
-        if "Desktop" in path.parts and not path.exists():
+        if "spark-personality-chip-labs" in str(path) and not path.exists():
             continue
         paths.append(path)
     return paths
