@@ -145,8 +145,8 @@ def _validate_score(value: Any, field_name: str) -> None:
 
 
 _CHIP_SCHEMA_HINT = (
-    " See spark-personality-chip-labs/schema/spark-personality-chip.v1.md for the "
-    "canonical field reference and a worked example."
+    " See docs/ARCHITECTURE.md (schema: spark-personality-chip.v1) for the "
+    "canonical chip YAML overview."
 )
 
 
