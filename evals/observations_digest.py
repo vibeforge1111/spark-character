@@ -33,6 +33,8 @@ OBSERVATIONS_FILE_DEFAULT = Path("evals/_observations.jsonl")
 
 
 def _load(path: Path, *, limit: int) -> list[dict]:
+    if limit <= 0:
+        return []
     if not path.exists():
         return []
     rows: list[dict] = []

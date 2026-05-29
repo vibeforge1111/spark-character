@@ -121,6 +121,8 @@ class AuditMiner:
         limit: int = 100,
         only_user: str | None = None,
     ) -> AuditFindings:
+        if limit <= 0:
+            return AuditFindings()
         if not self.log_path.exists():
             return AuditFindings()
         lines = self.log_path.read_text(encoding="utf-8", errors="replace").splitlines()

@@ -228,6 +228,8 @@ def follow_audit_rows(
 
 
 def replay_recent_rows(log_path: Path, *, limit: int = 50) -> list[dict]:
+    if limit <= 0:
+        return []
     if not log_path.exists():
         return []
     rows: list[dict] = []

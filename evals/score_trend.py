@@ -35,6 +35,8 @@ TIER_KEYS = (
 
 
 def _load(history_path: Path, *, limit: int) -> list[dict]:
+    if limit <= 0:
+        return []
     if not history_path.exists():
         return []
     rows: list[dict] = []
