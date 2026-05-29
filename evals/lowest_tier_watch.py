@@ -271,7 +271,10 @@ def main() -> int:
             _write_heartbeat(heartbeat_path, "sleeping")
             time.sleep(max(60, args.check_interval))
         except KeyboardInterrupt:
-            print("[lowest_tier_watch] interrupted by operator", flush=True)
+            print(
+                f"[lowest_tier_watch] interrupted by operator — state preserved at {state_path}; re-run with the same --state-file to resume tracking from this point.",
+                flush=True,
+            )
             return 0
         except Exception as exc:
             print(f"[lowest_tier_watch] error: {exc}", flush=True)
