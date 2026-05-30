@@ -15,13 +15,26 @@ def test_em_dash_family_imported_from_output_sanitizer():
 
 
 def test_em_dash_fails_p1() -> None:
-    score = score_persona("Two chips routing: em dash.")
+    score = score_persona("Two chips routing—em dash.")
     assert score.p1_em_dash == 0.0
 
 
 def test_en_dash_fails_p1() -> None:
-    score = score_persona("Revenue grew from 10 to 100 per day.")
+    score = score_persona("Revenue grew from 10–100 per day.")
     assert score.p1_em_dash == 0.0
+
+
+def test_em_dash_at_threshold() -> None:
+    # exactly one em-dash family char in an otherwise clean sentence — minimum violation
+    score = score_persona("Ship it—one reason only.")
+    assert score.p1_em_dash == 0.0, "single em-dash must fail P1 (at-threshold boundary)"
+    assert not score.passed, "score.passed must be False when P1 is 0.0"
+
+
+def test_em_dash_below_threshold() -> None:
+    # zero em-dash family chars — no violation, P1 must pass
+    score = score_persona("Ship it. One reason only.")
+    assert score.p1_em_dash == 1.0, "text with no dash-family chars must pass P1"
 
 
 def test_hyphen_passes_p1() -> None:

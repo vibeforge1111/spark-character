@@ -31,8 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .output_sanitizer import EM_DASH_FAMILY
 from .scoring import (
-    EM_DASH,
     HEDGE_PATTERN,
     PLUMBING_PATTERN,
     RESET_PATTERN,
@@ -167,8 +167,9 @@ class AuditMiner:
 
 def _detect_failures(text: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
-    if EM_DASH in text:
-        out.append(("em_dash", f"{text.count(EM_DASH)} occurrences"))
+    if any(ch in text for ch in EM_DASH_FAMILY):
+        count = sum(text.count(ch) for ch in EM_DASH_FAMILY)
+        out.append(("em_dash", f"{count} occurrences"))
     markdown_matches = MARKDOWN_EMPHASIS_PATTERN.findall(text)
     if markdown_matches:
         out.append(("markdown_emphasis", f"{len(markdown_matches)} markdown emphasis markers"))
