@@ -163,7 +163,7 @@ def fire_evolution(
     if dry_run:
         print(f"[lowest_tier_watch] dry-run, would run: {' '.join(cmd)}", flush=True)
         return False, ""
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root, timeout=2400)
     log_tail = (result.stdout or "")[-3000:]
     print(log_tail, flush=True)
     promoted = "PROMOTED:" in (result.stdout or "")
