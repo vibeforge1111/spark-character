@@ -102,7 +102,10 @@ def _load_seen(path: Path) -> set[str]:
     if not path.exists():
         return set()
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
         return set(data.get("seen_trace_refs", []))
     except Exception:
         return set()
