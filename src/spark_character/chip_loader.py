@@ -302,6 +302,12 @@ def load_chip_by_id(
 
     recoverable_load_errors = (OSError, ValueError, yaml.YAMLError)
     paths = search_paths or default_chip_lab_paths()
+
+    # Path traversal guard — reject chip IDs that contain path separators
+    # or parent directory references.
+    if "/" in chip_id or "\\" in chip_id or ".." in chip_id:
+        raise ValueError(f"chip_id must not contain path separators: {chip_id!r}")
+
     for base in paths:
         if not base.exists():
             continue
