@@ -49,8 +49,11 @@ class DistinctivenessScore:
 
 
 def _load_corpus(path: Path) -> list[dict]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return list(data.get("entries") or [])
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return list(data.get("entries") or [])
+    except (json.JSONDecodeError, OSError):
+        return []
 
 
 def _format_examples(label: str, samples: list[dict]) -> str:
