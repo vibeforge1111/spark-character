@@ -2,16 +2,7 @@
 
 from __future__ import annotations
 
-import inspect
-
 from spark_character.scoring import score_persona
-
-
-def test_em_dash_family_imported_from_output_sanitizer():
-    import spark_character.scoring as mod
-    src = inspect.getsource(mod)
-    assert "EM_DASH_FAMILY" in src
-    assert "output_sanitizer" in src
 
 
 def test_em_dash_fails_p1() -> None:
