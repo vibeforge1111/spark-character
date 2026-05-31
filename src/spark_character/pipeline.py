@@ -225,6 +225,6 @@ def _accept_rewrite_or_keep(draft: str, result: CritiqueResult) -> str:
         return draft
     draft_score = score_persona(draft)
     rewrite_score = score_persona(result.final)
-    if rewrite_score.mean >= draft_score.mean:
+    if rewrite_score.mean > draft_score.mean:
         return result.final
     return draft
