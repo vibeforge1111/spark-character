@@ -61,6 +61,14 @@ def find_chip_lab_path() -> Path | None:
 
 def _personality_yaml_path(lab: Path, chip_id: str) -> Path:
     """Build a chip YAML path without allowing chip ids to escape the lab."""
+    # Reject empty / whitespace-only chip_id at the boundary. Without this
+    # guard, an empty string composes to '<lab>/.personality.yaml' and a
+    # whitespace-only id composes to '<lab>/   .personality.yaml'. Both
+    # pass the relative_to check below (they're inside lab) but neither
+    # is a usable personality chip — they leak as phantom files into the
+    # lab directory and confuse the registry lookup.
+    if not chip_id or not chip_id.strip():
+        raise ValueError("chip_id must be a non-empty, non-whitespace string.")
     root = lab.resolve()
     target = (root / f"{chip_id}.personality.yaml").resolve()
     target.relative_to(root)
