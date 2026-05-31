@@ -18,7 +18,9 @@ Limitations:
   because their text is hand-written and not voice-evolvable.
 
 Usage:
-    miner = AuditMiner.from_sib_home("C:/Users/.../<home>")
+    from pathlib import Path
+
+    miner = AuditMiner.from_sib_home(Path.home() / ".spark" / "sib-home")
     findings = miner.recent_findings(limit=50)
     print(findings.summary())
 """

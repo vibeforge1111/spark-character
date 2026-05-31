@@ -1,4 +1,12 @@
-from spark_character.audit_miner import AuditFailure, AuditFindings, _detect_failures
+from pathlib import Path
+
+from spark_character import audit_miner
+from spark_character.audit_miner import (
+    AuditFailure,
+    AuditFindings,
+    AuditMiner,
+    _detect_failures,
+)
 
 
 def _failure_kinds(text: str) -> set[str]:
@@ -28,6 +36,19 @@ def test_does_not_flag_short_scannable_reply_as_dense():
     kinds = _failure_kinds(text)
 
     assert "dense_opening" not in kinds
+
+
+def test_audit_miner_module_docstring_uses_platform_safe_home_example():
+    doc = audit_miner.__doc__ or ""
+
+    assert "C:/Users" not in doc
+    assert 'Path.home() / ".spark" / "sib-home"' in doc
+
+
+def test_from_sib_home_accepts_path_home_style(tmp_path: Path):
+    miner = AuditMiner.from_sib_home(tmp_path)
+
+    assert miner.log_path == tmp_path / "logs" / "gateway-outbound.jsonl"
 
 
 def test_diagnose_lines_do_not_include_reply_preview():
