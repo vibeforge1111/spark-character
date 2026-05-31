@@ -69,7 +69,9 @@ def _open_state(sib_home: str | Path) -> sqlite3.Connection:
     db = Path(sib_home) / "state.db"
     if not db.exists():
         raise FileNotFoundError(f"state.db not found in {sib_home}")
-    return sqlite3.connect(str(db))
+    con = sqlite3.connect(str(db), timeout=5.0)
+    con.execute("PRAGMA journal_mode=WAL")
+    return con
 
 
 def latest_user_instructions(
@@ -98,6 +100,9 @@ def latest_user_instructions(
         params.append(limit)
         cur.execute(sql, params)
         rows = cur.fetchall()
+    except BaseException:
+        con.close()
+        raise
     finally:
         con.close()
     return [
@@ -134,6 +139,9 @@ def latest_user_states(
         params.append(limit)
         cur.execute(sql, params)
         rows = cur.fetchall()
+    except BaseException:
+        con.close()
+        raise
     finally:
         con.close()
     return [
