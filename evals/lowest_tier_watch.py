@@ -163,7 +163,11 @@ def fire_evolution(
     if dry_run:
         print(f"[lowest_tier_watch] dry-run, would run: {' '.join(cmd)}", flush=True)
         return False, ""
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root, timeout=2400)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root, timeout=2400)
+    except subprocess.TimeoutExpired as exc:
+        print(f"[lowest_tier_watch] evolution timed out after 2400s: {exc}", flush=True)
+        return False, f"[timeout] evolution subprocess exceeded 2400s limit"
     log_tail = (result.stdout or "")[-3000:]
     print(log_tail, flush=True)
     promoted = "PROMOTED:" in (result.stdout or "")
