@@ -316,6 +316,17 @@ def _sanitize_mutator_output(text: str) -> str:
     return raw
 
 
+def _positive_int(value: str) -> int:
+    """argparse helper: accept only strictly positive integers."""
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {ivalue}")
+    return ivalue
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidates", type=int, default=3)
@@ -341,9 +352,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--audit-limit",
-        type=int,
+        type=_positive_int,
         default=200,
-        help="How many recent SIB outbound rows to mine when --sib-home is set.",
+        help="How many recent SIB outbound rows to mine when --sib-home is set (must be a positive integer).",
     )
     parser.add_argument(
         "--chip-load",
