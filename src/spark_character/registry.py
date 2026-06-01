@@ -56,8 +56,11 @@ def find_chip_lab_path() -> Path | None:
 
 def _personality_yaml_path(lab: Path, chip_id: str) -> Path:
     """Build a chip YAML path without allowing chip ids to escape the lab."""
+    safe_chip_id = str(chip_id or "").strip()
+    if not safe_chip_id:
+        raise ValueError("Personality chip id is required.")
     root = lab.resolve()
-    target = (root / f"{chip_id}.personality.yaml").resolve()
+    target = (root / f"{safe_chip_id}.personality.yaml").resolve()
     target.relative_to(root)
     return target
 

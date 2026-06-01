@@ -9,6 +9,7 @@ import yaml
 
 from spark_character.chip_loader import PersonalityChip
 from spark_character.registry import (
+    _personality_yaml_path,
     promote_evolved_chip_to_chip_lab,
     promote_evolved_persona_to_chip_lab,
 )
@@ -126,6 +127,12 @@ def test_persona_sidecar_promotion_rejects_chip_id_path_escape(tmp_path: Path) -
         )
 
     assert not outside.exists()
+
+
+@pytest.mark.parametrize("chip_id", ["", " ", "\t\n"])
+def test_personality_yaml_path_rejects_blank_chip_id(tmp_path: Path, chip_id: str) -> None:
+    with pytest.raises(ValueError, match="chip id is required"):
+        _personality_yaml_path(tmp_path, chip_id)
 
 
 def test_chip_promotion_rejects_chip_id_path_escape(tmp_path: Path) -> None:
