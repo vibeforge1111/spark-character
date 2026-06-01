@@ -34,6 +34,7 @@ chip is active.
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 from dataclasses import dataclass, field
@@ -41,6 +42,9 @@ from pathlib import Path
 from typing import Any
 
 from .prompt_guard import sanitize_prompt_text
+
+
+logger = logging.getLogger(__name__)
 
 try:  # optional dependency
     from personality_engine.loader import load_personality as _lab_load_personality  # type: ignore
@@ -88,11 +92,26 @@ class PersonalityChip:
     _raw: dict = field(default_factory=dict, repr=False)
 
 
-DEFAULT_CHIP_LAB_PATHS = (
-    Path(os.path.expanduser("~/Desktop/spark-personality-chip-labs/personalities")),
-    Path("./personalities"),
-    Path(os.path.expanduser("~/.spark/personalities")),
+DEFAULT_CHIP_LAB_PATHS = tuple(
+    p for p in (
+        Path(os.path.expanduser('~/.spark/modules/spark-personality-chip-labs/source/personalities')),
+        Path(os.path.expanduser('~/.spark/spark-personality-chip-labs/personalities')),
+        Path(os.path.expanduser('~/Desktop/spark-personality-chip-labs/personalities')),
+        Path('./personalities'),
+        Path(os.path.expanduser('~/.spark/personalities')),
+    )
+    if p == Path('./personalities') or p.exists()
 )
+
+
+def default_chip_lab_paths() -> list[Path]:
+    """Return default chip search paths without unavailable desktop-only labs."""
+    paths: list[Path] = []
+    for path in DEFAULT_CHIP_LAB_PATHS:
+        if "spark-personality-chip-labs" in path.parts and not path.exists():
+            continue
+        paths.append(path)
+    return paths
 
 
 TRAIT_FIELDS = (
@@ -288,7 +307,10 @@ def load_chip_by_id(
     search_paths: list[Path] | None = None,
 ) -> PersonalityChip:
     """Find a personality chip by its identity.id across known paths."""
-    paths = search_paths or list(DEFAULT_CHIP_LAB_PATHS)
+    import yaml  # type: ignore
+
+    recoverable_load_errors = (OSError, ValueError, yaml.YAMLError)
+    paths = search_paths or default_chip_lab_paths()
     for base in paths:
         if not base.exists():
             continue
@@ -298,7 +320,8 @@ def load_chip_by_id(
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
-            except (OSError, ValueError):
+            except recoverable_load_errors as exc:
+                logger.warning("Failed to load personality chip %s: %s", entry.name, exc)
                 continue
             if chip.id == chip_id:
                 return chip
