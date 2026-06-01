@@ -92,24 +92,27 @@ class PersonalityChip:
     _raw: dict = field(default_factory=dict, repr=False)
 
 
-DEFAULT_CHIP_LAB_PATHS = tuple(
-    p for p in (
-        Path(os.path.expanduser('~/.spark/modules/spark-personality-chip-labs/source/personalities')),
-        Path(os.path.expanduser('~/.spark/spark-personality-chip-labs/personalities')),
-        Path(os.path.expanduser('~/Desktop/spark-personality-chip-labs/personalities')),
-        Path('./personalities'),
-        Path(os.path.expanduser('~/.spark/personalities')),
-    )
-    if p == Path('./personalities') or p.exists()
-)
+DEFAULT_CHIP_LAB_PATHS = (
+    Path(os.path.expanduser("~/.spark/modules/spark-personality-chip-labs/source/personalities")),
+    Path(os.path.expanduser("~/.spark/spark-personality-chip-labs/personalities")),
+    Path(os.path.expanduser("~/Desktop/spark-personality-chip-labs/personalities")),
+    Path("./personalities"),
+    Path(os.path.expanduser("~/.spark/personalities")),
 )
 
 
 def default_chip_lab_paths() -> list[Path]:
-    """Return default chip search paths without unavailable desktop-only labs."""
+    """Return default chip search paths without unavailable or unreadable labs.
+
+    Skips spark-personality-chip-labs paths that do not exist, and skips any
+    path that exists but is not readable (e.g. permission-restricted directories
+    on Android/Termux where os.access returns False).
+    """
     paths: list[Path] = []
     for path in DEFAULT_CHIP_LAB_PATHS:
         if "spark-personality-chip-labs" in path.parts and not path.exists():
+            continue
+        if path.exists() and not os.access(path, os.R_OK):
             continue
         paths.append(path)
     return paths
