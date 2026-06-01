@@ -58,10 +58,21 @@ PROMPTS = [
 ]
 
 
+def _positive_int(value: str) -> int:
+    """argparse helper: accept only strictly positive integers."""
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {ivalue}")
+    return ivalue
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="spark-character live persona pulse")
     parser.add_argument("--critic", action="store_true", help="Run the critic-rewrite pass after generation")
-    parser.add_argument("--max-tokens", type=int, default=600)
+    parser.add_argument("--max-tokens", type=_positive_int, default=600, help="Maximum tokens per reply (must be a positive integer)")
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--out", default="evals/_pulse_last.json")
     args = parser.parse_args()
