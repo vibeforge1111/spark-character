@@ -109,8 +109,11 @@ def set_latest_persona_version(
     if pointer_path.exists():
         os.chmod(pointer_path, 0o666)
     temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
-    temp_path.write_text(f"{resolved}\n", encoding="utf-8")
-    os.replace(temp_path, pointer_path)
+    try:
+        temp_path.write_text(f"{resolved}\n", encoding="utf-8")
+        os.replace(temp_path, pointer_path)
+    finally:
+        temp_path.unlink(missing_ok=True)
     protect_latest_pointer(pointer_path)
 
     record = {
