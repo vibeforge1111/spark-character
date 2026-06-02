@@ -300,6 +300,15 @@ def load_chip(path: str | Path) -> PersonalityChip:
     return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
 
 
+def _safe_chip_id(value: str) -> str:
+    chip_id = str(value or "").strip()
+    if not chip_id:
+        raise ValueError("Personality chip id is required.")
+    if "/" in chip_id or "\\" in chip_id:
+        raise ValueError(f"Personality chip id must not contain path separators: {chip_id!r}")
+    return chip_id
+
+
 def load_chip_by_id(
     chip_id: str,
     *,
@@ -310,10 +319,11 @@ def load_chip_by_id(
 
     recoverable_load_errors = (OSError, ValueError, yaml.YAMLError)
     paths = search_paths or default_chip_lab_paths()
+    safe_chip_id = _safe_chip_id(chip_id)
     for base in paths:
         if not base.exists():
             continue
-        candidate = base / f"{chip_id}.personality.yaml"
+        candidate = base / f"{safe_chip_id}.personality.yaml"
         if candidate.exists():
             return load_chip(candidate)
         for entry in base.glob("*.personality.yaml"):
@@ -322,10 +332,10 @@ def load_chip_by_id(
             except recoverable_load_errors as exc:
                 logger.warning("Failed to load personality chip %s: %s", entry.name, exc)
                 continue
-            if chip.id == chip_id:
+            if chip.id == safe_chip_id:
                 return chip
     raise FileNotFoundError(
-        f"Personality chip '{chip_id}' not found in: {[str(p) for p in paths]}"
+        f"Personality chip '{safe_chip_id}' not found in: {[str(p) for p in paths]}"
     )
 
 

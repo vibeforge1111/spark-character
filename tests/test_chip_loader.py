@@ -139,6 +139,35 @@ def test_load_chip_by_id_skips_malformed_yaml_and_finds_valid_chip(
     assert "Failed to load personality chip broken.personality.yaml" in caplog.text
 
 
+@pytest.mark.parametrize("chip_id", ["", " ", "\t\n"])
+def test_load_chip_by_id_rejects_blank_chip_id(chip_id: str) -> None:
+    with pytest.raises(ValueError, match="chip id is required"):
+        chip_loader.load_chip_by_id(chip_id, search_paths=[])
+
+
+@pytest.mark.parametrize("chip_id", ["../escaped", "..\\escaped", "nested/chip", "nested\\chip"])
+def test_load_chip_by_id_rejects_path_like_chip_id(tmp_path: Path, chip_id: str) -> None:
+    with pytest.raises(ValueError, match="path separators"):
+        chip_loader.load_chip_by_id(chip_id, search_paths=[tmp_path])
+
+
+def test_load_chip_by_id_allows_non_path_dotted_chip_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(chip_loader, "_LAB_AVAILABLE", False)
+    monkeypatch.setattr(chip_loader, "_lab_load_personality", None)
+    chip_id = "founder.v2"
+    (tmp_path / f"{chip_id}.personality.yaml").write_text(
+        VALID_CHIP_YAML.replace("id: founder-operator", f"id: {chip_id}"),
+        encoding="utf-8",
+    )
+
+    chip = chip_loader.load_chip_by_id(chip_id, search_paths=[tmp_path])
+
+    assert chip.id == chip_id
+
+
 def test_load_chip_by_id_omits_unavailable_desktop_lab_from_default_paths(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
