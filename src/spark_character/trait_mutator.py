@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import re
 from dataclasses import dataclass, replace
 from typing import Any
@@ -212,6 +213,15 @@ def _clamp_dict(
         try:
             v = float(raw_val)
         except (TypeError, ValueError):
+            continue
+        # Reject NaN / +-Infinity before clamping. Python's json.loads accepts
+        # both bare `NaN` / `Infinity` literals and overflow-to-inf numerics
+        # (e.g. `1e500` parses to `float('inf')`). Without this guard the
+        # min/max clamp silently saturates NaN/Inf to ±max_delta, so a single
+        # malformed mutator response can force the maximum-allowed move on a
+        # trait every cycle (a silent unbounded drift instead of an early
+        # rejection like the LLM-output contract documents).
+        if not math.isfinite(v):
             continue
         v = max(-max_delta, min(max_delta, v))
         if v != 0.0:
