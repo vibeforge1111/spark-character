@@ -139,6 +139,16 @@ def maybe_refresh_consumers(args) -> None:
             print(f"[auto_loop] consumer refresh failed for {py}: {exc}")
 
 
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {parsed}")
+    return parsed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sib-home", required=True)
@@ -146,7 +156,7 @@ def main() -> int:
     parser.add_argument("--new-replies-threshold", type=int, default=25)
     parser.add_argument("--candidates", type=int, default=3)
     parser.add_argument("--weights", default="0.2,0.5,0.3")
-    parser.add_argument("--audit-limit", type=int, default=200)
+    parser.add_argument("--audit-limit", type=_positive_int, default=200, help="Number of recent audit failures to seed each evolve cycle (must be a positive integer)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--once", action="store_true", help="Run a single check then exit")
     parser.add_argument("--state-file", default=str(STATE_FILE_DEFAULT))

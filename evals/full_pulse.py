@@ -49,10 +49,21 @@ T1_PROMPTS = [
 ]
 
 
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {parsed}")
+    return parsed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="evals/_full_pulse.json")
-    parser.add_argument("--max-tokens", type=int, default=600)
+    parser.add_argument("--max-tokens", type=_positive_int, default=600,
+                        help="Per-call max output tokens for the live provider (must be a positive integer)")
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--include-sustained", action="store_true",
                         help="Include T11 sustained-attack scenarios (6-7 turns each, expensive)")

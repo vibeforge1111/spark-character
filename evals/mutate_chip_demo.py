@@ -30,11 +30,22 @@ from spark_character import (  # noqa: E402
 )
 
 
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {parsed}")
+    return parsed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="founder-operator")
     parser.add_argument("--sib-home", default=None)
-    parser.add_argument("--audit-limit", type=int, default=200)
+    parser.add_argument("--audit-limit", type=_positive_int, default=200,
+                        help="Number of recent audit rows to mine when --sib-home is set (must be a positive integer)")
     parser.add_argument("--label", default="trait-demo")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

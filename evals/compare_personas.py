@@ -127,11 +127,22 @@ def composite(row: dict, weights: tuple[float, ...]) -> float:
     )
 
 
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {parsed}")
+    return parsed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", default="v5")
     parser.add_argument("--candidate", default="v6")
-    parser.add_argument("--max-tokens", type=int, default=600)
+    parser.add_argument("--max-tokens", type=_positive_int, default=600,
+                        help="Per-call max output tokens for the upstream LLM (must be a positive integer)")
     parser.add_argument(
         "--weights",
         default="0.20,0.30,0.20,0.10,0.10,0.10",
