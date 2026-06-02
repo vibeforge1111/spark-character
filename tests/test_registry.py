@@ -49,22 +49,17 @@ def test_persona_sidecar_promotion_does_not_export_scores(tmp_path: Path) -> Non
     assert "delta_summary" not in evolved
 
 
-def test_persona_sidecar_promotion_ignores_malformed_base_yaml(tmp_path: Path) -> None:
+def test_persona_sidecar_promotion_rejects_malformed_base_yaml(tmp_path: Path) -> None:
     (tmp_path / "founder-operator.personality.yaml").write_text("identity: [", encoding="utf-8")
 
-    target = promote_evolved_persona_to_chip_lab(
-        base_chip_id="founder-operator",
-        base_persona_version="v8",
-        new_persona_version="v9",
-        persona_markdown="New voice rules",
-        lab_path=tmp_path,
-    )
-
-    assert target is not None
-    spec = yaml.safe_load(target.read_text(encoding="utf-8"))
-    assert spec["identity"]["id"] == "founder-operator-evolved-v9"
-    assert spec["identity"]["name"] == "founder-operator"
-    assert spec["voice_rules_override"] == "New voice rules"
+    with pytest.raises(ValueError, match="Base personality chip YAML is invalid"):
+        promote_evolved_persona_to_chip_lab(
+            base_chip_id="founder-operator",
+            base_persona_version="v8",
+            new_persona_version="v9",
+            persona_markdown="New voice rules",
+            lab_path=tmp_path,
+        )
 
 
 def test_persona_sidecar_promotion_does_not_swallow_unexpected_validation_errors(

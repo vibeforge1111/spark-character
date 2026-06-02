@@ -94,8 +94,10 @@ def promote_evolved_persona_to_chip_lab(
     if base_yaml_path.exists():
         try:
             base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
-        except (OSError, ValueError, yaml.YAMLError):
-            base_spec = {}
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            raise ValueError(
+                f"Base personality chip YAML is invalid: {base_yaml_path}"
+            ) from exc
 
     # Carry everything from the base chip forward, then mark this as an
     # evolved variant and embed the new voice rules.
