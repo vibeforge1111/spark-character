@@ -37,6 +37,7 @@ Or in evolve / pulse drivers:
 from __future__ import annotations
 
 import html
+import logging
 import re
 from dataclasses import dataclass
 from typing import Callable
@@ -44,6 +45,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import httpx
 
+logger = logging.getLogger(__name__)
 
 _LIVE_DATA_PATTERNS = (
     r"\b(?:current|today's|latest|right now|recent|breaking)\s+",
@@ -99,7 +101,8 @@ def search_results_for(
     try:
         results = fn(query)
         return results[:max_results]
-    except (httpx.HTTPError, OSError, ValueError):
+    except (httpx.HTTPError, OSError, ValueError) as exc:
+        logger.warning("Live search failed for %r: %s", query, exc)
         return []
 
 

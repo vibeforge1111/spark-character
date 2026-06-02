@@ -44,6 +44,15 @@ def test_attach_search_context_only_if_needed_skips_irrelevant() -> None:
     assert out == "How do I write a Python decorator?"
 
 
+def test_search_results_for_logs_failure(caplog: pytest.LogCaptureFixture) -> None:
+    def boom(_query: str) -> list[SearchResult]:
+        raise httpx.HTTPError("network down")
+
+    with caplog.at_level("WARNING"):
+        assert search_results_for("btc price", search_fn=boom) == []
+    assert any("Live search failed" in record.message for record in caplog.records)
+
+
 def test_attach_search_context_injects_when_relevant() -> None:
     fake = lambda q: [
         SearchResult("Bitcoin price", "BTC at $X today", "https://coingecko.com"),
