@@ -79,6 +79,25 @@ def _join_url(base_url: str, path_name: str) -> str:
     return f"{safe_base_url.rstrip('/')}/{path_name.lstrip('/')}"
 
 
+def _parse_provider_response_json(resp: httpx.Response) -> dict[str, Any]:
+    """Parse provider JSON without crashing on HTML challenge pages."""
+    content_type = (resp.headers.get("content-type") or "").lower()
+    if "json" not in content_type and "application/" in content_type:
+        raise RuntimeError(
+            f"Provider returned non-JSON content-type: {content_type or 'unknown'}"
+        )
+    try:
+        body = resp.json()
+    except ValueError as exc:
+        preview = (resp.text or "")[:160].replace("\n", " ")
+        raise RuntimeError(
+            f"Provider returned invalid JSON (status {resp.status_code}): {preview!r}"
+        ) from exc
+    if not isinstance(body, dict):
+        raise RuntimeError("Provider JSON body must be an object.")
+    return body
+
+
 def call_provider(
     *,
     provider: ProviderSpec,
@@ -122,7 +141,7 @@ def call_provider(
     with httpx.Client(timeout=provider.timeout_seconds) as client:
         resp = client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
-        body = resp.json()
+        body = _parse_provider_response_json(resp)
     return _extract_text(body)
 
 
@@ -159,7 +178,7 @@ async def call_provider_async(
     async with httpx.AsyncClient(timeout=provider.timeout_seconds) as client:
         resp = await client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
-        body = resp.json()
+        body = _parse_provider_response_json(resp)
     return _extract_text(body)
 
 
