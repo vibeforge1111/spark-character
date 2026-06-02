@@ -183,6 +183,24 @@ def test_default_chip_lab_paths_include_available_spark_module_lab(
     assert chip_loader.default_chip_lab_paths() == [module_lab, desktop_lab, fallback_lab]
 
 
+def test_default_chip_lab_paths_skip_unreadable_existing_labs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unreadable_lab = tmp_path / "spark-personality-chip-labs" / "personalities"
+    fallback_lab = tmp_path / ".spark" / "personalities"
+    unreadable_lab.mkdir(parents=True)
+    fallback_lab.mkdir(parents=True)
+    monkeypatch.setattr(
+        chip_loader,
+        "DEFAULT_CHIP_LAB_PATHS",
+        (unreadable_lab, fallback_lab),
+    )
+    monkeypatch.setattr(chip_loader.os, "access", lambda path, mode: Path(path) != unreadable_lab)
+
+    assert chip_loader.default_chip_lab_paths() == [fallback_lab]
+
+
 def test_load_chip_by_id_does_not_swallow_unexpected_loader_errors(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

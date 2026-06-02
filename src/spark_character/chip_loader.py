@@ -102,10 +102,12 @@ DEFAULT_CHIP_LAB_PATHS = (
 
 
 def default_chip_lab_paths() -> list[Path]:
-    """Return default chip search paths without unavailable desktop-only labs."""
+    """Return default chip search paths without unavailable or unreadable labs."""
     paths: list[Path] = []
     for path in DEFAULT_CHIP_LAB_PATHS:
         if "spark-personality-chip-labs" in path.parts and not path.exists():
+            continue
+        if path.exists() and not os.access(path, os.R_OK):
             continue
         paths.append(path)
     return paths
