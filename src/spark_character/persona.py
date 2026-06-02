@@ -37,22 +37,25 @@ class PersonaSpec:
 def load_overlay(provider_kind: str | None) -> str:
     """Return the overlay markdown for a given backend kind, or '' if
     none is configured. Provider kinds: 'zai', 'minimax', 'codex',
-    'openai', 'ollama'. Unknown kinds return ''."""
+    'deepseek', 'openai', 'claude', 'openrouter', etc."""
     if not provider_kind:
         return ""
-    path = OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md"
+    safe_name = provider_kind.lower().strip()
+    if "/" in safe_name or "\\" in safe_name or ".." in safe_name:
+        return ""
+    path = OVERLAYS_DIR / f"{safe_name}.md"
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
 
 
 def load_surface_overlay(surface: str | None) -> str:
-    """Return the overlay markdown for a given surface, or '' if none
-    is configured. Surfaces: 'voice', 'browser_extension', 'telegram',
-    'tui', 'cli'. Unknown surfaces return ''."""
     if not surface:
         return ""
-    path = OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md"
+    safe_surface = surface.lower().strip()
+    if "/" in safe_surface or "\\" in safe_surface or ".." in safe_surface:
+        return ""
+    path = OVERLAYS_DIR / f"{safe_surface}.md"
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
