@@ -78,7 +78,9 @@ def detect_provider_kind(provider) -> str | None:
 def validate_persona_version(version: str) -> str:
     value = str(version or "").strip()
     if not PERSONA_VERSION_PATTERN.fullmatch(value):
-        raise ValueError("Persona version must match vN, for example v8.")
+        raise ValueError(
+            f"Persona version must match vN (e.g. v8). Got: {value!r}."
+        )
     return value
 
 
