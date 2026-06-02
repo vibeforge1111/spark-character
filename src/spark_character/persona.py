@@ -133,10 +133,16 @@ def resolve_latest_persona_version() -> str:
       2. Highest-numbered persona.vN.md file on disk.
       3. DEFAULT_PERSONA_VERSION as the final fallback.
     """
-    if LATEST_POINTER.exists():
+    # EAFP: a single read with try/except is atomic; the previous
+    # exists()-then-read_text() opened a race window where the evolution
+    # loop could rotate or delete persona.latest.txt between the check
+    # and the read, raising FileNotFoundError out of the resolver.
+    try:
         text = LATEST_POINTER.read_text(encoding="utf-8").strip()
-        if text:
-            return validate_persona_version(text)
+    except FileNotFoundError:
+        text = ""
+    if text:
+        return validate_persona_version(text)
     versions: list[int] = []
     for path in ARTIFACTS_DIR.glob("persona.v*.md"):
         try:
