@@ -325,7 +325,10 @@ def load_chip_by_id(
             continue
         candidate = base / f"{safe_chip_id}.personality.yaml"
         if candidate.exists():
-            return load_chip(candidate)
+            try:
+                return load_chip(candidate)
+            except recoverable_load_errors as exc:
+                raise ValueError(f"Personality chip file is invalid: {candidate}") from exc
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
