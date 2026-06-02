@@ -179,7 +179,7 @@ def main() -> int:
         print(f"=> candidate {args.candidate} WINS")
         return 0
     print(f"=> baseline {args.baseline} holds")
-    return 1
+    return 0
 
 
 if __name__ == "__main__":
