@@ -87,13 +87,19 @@ def search_results_for(
     max_results: int = 5,
     timeout_seconds: float = 8.0,
     search_fn: Callable[[str], list[SearchResult]] | None = None,
+    network_policy: str = "none",
 ) -> list[SearchResult]:
     """Search the web for `query` and return up to `max_results` SearchResults.
 
     Default backend: DuckDuckGo HTML endpoint. Pluggable via search_fn.
     Soft-fails: returns [] on any error so the caller can fall through.
+    Live network is policy-bound: the default web backend only runs when
+    network_policy is "allow" or "external_allowed". Injected search_fn
+    callers are already taking ownership of the fetch boundary.
     """
     if not query.strip():
+        return []
+    if search_fn is None and network_policy not in {"allow", "external_allowed"}:
         return []
     fn = search_fn or _duckduckgo_html_search
     try:
@@ -110,6 +116,7 @@ def attach_search_context(
     max_results: int = 4,
     search_fn: Callable[[str], list[SearchResult]] | None = None,
     only_if_needed: bool = True,
+    network_policy: str = "none",
 ) -> str:
     """Return a prompt with live search context attached when relevant.
 
@@ -120,7 +127,7 @@ def attach_search_context(
     if only_if_needed and not detect_needs_live_data(user_message):
         return user_message
     q = query or extract_search_query(user_message)
-    results = search_results_for(q, max_results=max_results, search_fn=search_fn)
+    results = search_results_for(q, max_results=max_results, search_fn=search_fn, network_policy=network_policy)
     if not results:
         return user_message
     context_lines = ["[Live search results, treat as ground truth for current data]"]

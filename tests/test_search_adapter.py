@@ -80,6 +80,25 @@ def test_attach_search_context_no_results_returns_original() -> None:
     assert out == "What's the latest BTC price?"
 
 
+def test_default_live_search_requires_network_policy() -> None:
+    out = search_results_for("current BTC price")
+
+    assert out == []
+
+
+def test_default_live_search_runs_when_network_policy_allows() -> None:
+    seen: list[str] = []
+
+    def fake(query: str) -> list[SearchResult]:
+        seen.append(query)
+        return [SearchResult("Allowed", "network boundary honored", "https://example.com")]
+
+    out = search_results_for("current BTC price", search_fn=fake, network_policy="allow")
+
+    assert seen == ["current BTC price"]
+    assert out[0].title == "Allowed"
+
+
 def test_parse_duckduckgo_html_minimal() -> None:
     html_text = """
     <html>
