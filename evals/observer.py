@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
@@ -50,6 +51,8 @@ from spark_character.audit_miner import LLM_ROUTES, _detect_failures  # noqa: E4
 OBSERVATIONS_FILE_DEFAULT = Path("evals/_observations.jsonl")
 SEEN_FILE_DEFAULT = Path("evals/_observer_seen.json")
 HEARTBEAT_FILE_DEFAULT = Path("evals/_observer_heartbeat.txt")
+
+logger = logging.getLogger(__name__)
 
 
 META_OBSERVER_SYSTEM = (
@@ -139,7 +142,15 @@ def _write_heartbeat(path: Path, phase: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{int(time.time())} {phase}\n", encoding="utf-8")
     except Exception:
-        pass
+        # Heartbeat writes feed external liveness checks; the observer must
+        # keep tailing audit rows even if disk is full or perms changed, but
+        # the operator needs a breadcrumb that the heartbeat stopped landing.
+        logger.warning(
+            "observer heartbeat write failed at %s (phase=%s); liveness checks will go stale",
+            path,
+            phase,
+            exc_info=True,
+        )
 
 
 def parse_observation_response(text: str) -> dict:
