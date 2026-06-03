@@ -134,9 +134,9 @@ def call_codex(
                 f"CLI is responsive."
             ) from exc
         if result.returncode != 0:
-            # Redact raw stderr (may carry internal paths / prompt fragments);
-            # keep the return code so operators can still triage.
-            raise RuntimeError(f"codex exec failed (rc={result.returncode})")
+            stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+            safe_stderr = stderr.strip()[:300].replace("\n", " ")
+            raise RuntimeError(f"codex exec failed (rc={result.returncode}): {safe_stderr}")
         if not out_path.exists():
             raise RuntimeError("codex exec did not write the expected output file.")
         text = out_path.read_text(encoding="utf-8", errors="replace").strip()
