@@ -27,6 +27,55 @@ def test_save_state_replaces_temp_file(tmp_path: Path) -> None:
     assert not (tmp_path / "state.json.tmp").exists()
 
 
+def test_save_state_releases_temp_file_when_replace_raises(tmp_path: Path, monkeypatch) -> None:
+    """If os.replace raises after the temp file is written, the orphan
+    state.json.tmp is released, not left to accumulate across crashes.
+
+    Regression for orphaned-temp leak: prior to the try/finally, every
+    EXDEV (cross-device rename), PermissionError, or transient FS fault
+    during os.replace left a state.json.tmp behind. Across repeated
+    failures the watcher home accumulated stale .tmp siblings."""
+    watcher = load_lowest_tier_watch()
+    state_path = tmp_path / "state.json"
+
+    def _boom(_src, _dst):
+        raise OSError("simulated cross-device rename / EXDEV")
+
+    monkeypatch.setattr(watcher.os, "replace", _boom)
+
+    try:
+        watcher._save_state(state_path, {"fires_total": 1})
+    except OSError:
+        pass
+
+    assert not (tmp_path / "state.json.tmp").exists(), (
+        "orphan state.json.tmp left behind after os.replace failure"
+    )
+
+
+def test_save_state_releases_temp_file_when_write_text_raises(tmp_path: Path, monkeypatch) -> None:
+    """If tmp.write_text raises mid-write (e.g. ENOSPC, EIO), the partial
+    temp file is released, not left to accumulate."""
+    watcher = load_lowest_tier_watch()
+    state_path = tmp_path / "state.json"
+
+    def _boom_write_text(self, *_args, **_kwargs):
+        # Simulate ENOSPC / EIO: the file gets created (touch) but write fails partway.
+        self.touch()
+        raise OSError("simulated ENOSPC / EIO during write_text")
+
+    monkeypatch.setattr(type(state_path), "write_text", _boom_write_text)
+
+    try:
+        watcher._save_state(state_path, {"fires_total": 1})
+    except OSError:
+        pass
+
+    assert not (tmp_path / "state.json.tmp").exists(), (
+        "orphan state.json.tmp left behind after write_text failure"
+    )
+
+
 def test_fire_evolution_returns_timeout_failure(tmp_path: Path, monkeypatch) -> None:
     watcher = load_lowest_tier_watch()
 
