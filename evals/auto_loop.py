@@ -61,7 +61,7 @@ def _load_state(path: Path) -> dict:
         }
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return {
             "last_evolved_at": 0,
             "last_audit_count": 0,
@@ -88,7 +88,7 @@ def _write_heartbeat(path: Path, phase: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{int(time.time())} {phase}\n", encoding="utf-8")
-    except Exception:
+    except OSError:
         pass
 
 
