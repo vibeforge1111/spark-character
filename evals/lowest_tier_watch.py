@@ -219,6 +219,7 @@ def main() -> int:
     parser.add_argument("--candidates", type=int, default=2)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
     args = parser.parse_args()
 
     history_path = Path(args.history_file)
