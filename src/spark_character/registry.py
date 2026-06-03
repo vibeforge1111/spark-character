@@ -1,3 +1,4 @@
+import tempfile
 """Promote evolved personas back to spark-personality-chip-labs.
 
 When evolve_persona ships a winning candidate, two things should happen:
