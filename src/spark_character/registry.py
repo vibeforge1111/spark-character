@@ -119,6 +119,7 @@ def promote_evolved_persona_to_chip_lab(
     out["voice_rules_override"] = persona_markdown.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
         encoding="utf-8",

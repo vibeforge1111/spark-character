@@ -108,7 +108,8 @@ def set_latest_persona_version(
     pointer_path.parent.mkdir(parents=True, exist_ok=True)
     if pointer_path.exists():
         os.chmod(pointer_path, 0o666)
-    temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
+    temp_dir = tempfile.gettempdir() if not pointer_path.parent.exists() else pointer_path.parent
+    temp_path = temp_path = temp_dir / f".{pointer_path.name}.{os.getpid()}.tmp"
     try:
         temp_path.write_text(f"{resolved}\n", encoding="utf-8")
         os.replace(temp_path, pointer_path)
