@@ -195,77 +195,86 @@ def run_full_eval(provider: ProviderSpec, persona, *, include_sustained: bool = 
     fast = run_fast_eval(provider, persona)
 
     t3_scores: list[float] = []
+    t3_failures = 0
     for probe in PROBES:
         try:
             r = run_probe(probe, provider=provider, persona=persona)
             t3_scores.append(r.score)
         except Exception:
-            pass
+            t3_failures += 1
 
     t4_scores: list[float] = []
+    t4_failures = 0
     for scenario in STABILITY_SCENARIOS:
         try:
             r = run_stability_scenario(scenario, provider=provider, persona=persona)
             t4_scores.append(r.score)
         except Exception:
-            pass
+            t4_failures += 1
 
     t6_scores: list[float] = []
+    t6_failures = 0
     for probe in T6_EMOTIONAL_ATTUNEMENT_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t6_scores.append(r.score)
         except Exception:
-            pass
+            t6_failures += 1
 
     t7_scores: list[float] = []
+    t7_failures = 0
     for probe in T7_MEMORY_COHERENCE_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t7_scores.append(r.score)
         except Exception:
-            pass
+            t7_failures += 1
 
     t8_scores: list[float] = []
+    t8_failures = 0
     for probe in T8_INITIATIVE_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t8_scores.append(r.score)
         except Exception:
-            pass
+            t8_failures += 1
 
     t9_scores: list[float] = []
+    t9_failures = 0
     for probe in T9_AESTHETIC_FINGERPRINT_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t9_scores.append(r.score)
         except Exception:
-            pass
+            t9_failures += 1
 
     t13_scores: list[float] = []
+    t13_failures = 0
     for probe in T13_HUMANE_DEPTH_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t13_scores.append(r.score)
         except Exception:
-            pass
+            t13_failures += 1
 
     t14_scores: list[float] = []
+    t14_failures = 0
     for probe in T14_MEMORABILITY_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t14_scores.append(r.score)
         except Exception:
-            pass
+            t14_failures += 1
 
     t11_scores: list[float] = []
+    t11_failures = 0
     if include_sustained:
         for scenario in T11_SUSTAINED_ATTACK_SCENARIOS:
             try:
                 r = run_stability_scenario(scenario, provider=provider, persona=persona)
                 t11_scores.append(r.score)
             except Exception:
-                pass
+                t11_failures += 1
 
     out = {
         **fast,
@@ -278,9 +287,20 @@ def run_full_eval(provider: ProviderSpec, persona, *, include_sustained: bool = 
         "t9_mean": round(mean_(t9_scores), 3) if t9_scores else 0.0,
         "t13_mean": round(mean_(t13_scores), 3) if t13_scores else 0.0,
         "t14_mean": round(mean_(t14_scores), 3) if t14_scores else 0.0,
+        "probe_failures": {
+            "t3": t3_failures,
+            "t4": t4_failures,
+            "t6": t6_failures,
+            "t7": t7_failures,
+            "t8": t8_failures,
+            "t9": t9_failures,
+            "t13": t13_failures,
+            "t14": t14_failures,
+        },
     }
     if include_sustained:
         out["t11_mean"] = round(mean_(t11_scores), 3) if t11_scores else 0.0
+        out["probe_failures"]["t11"] = t11_failures
     return out
 
 
