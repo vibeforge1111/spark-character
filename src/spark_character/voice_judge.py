@@ -50,7 +50,10 @@ class DistinctivenessScore:
 
 def _load_corpus(path: Path) -> list[dict]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"voice_judge corpus parse failed for {path}: {exc}") from exc
     except (OSError, json.JSONDecodeError):
         return []
     return list(data.get("entries") or [])
