@@ -17,15 +17,90 @@ INVISIBLE_UNICODE_CHARS = {
     "\u202d": "LEFT-TO-RIGHT OVERRIDE",
     "\u202e": "RIGHT-TO-LEFT OVERRIDE",
 }
-PROMPT_BOUNDARY_PREFIX = r"(?:^|[:\-]\s*)"
+PROMPT_BOUNDARY_PREFIX = r"(?:^|[:-]\s*)"
 STORED_PROMPT_INJECTION_PATTERNS = (
     (
         "instruction-override",
-        re.compile(PROMPT_BOUNDARY_PREFIX + r"(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+instructions\b", re.I),
+        re.compile(
+            PROMPT_BOUNDARY_PREFIX
+            + r"(ignore|disregard|forget|dismiss|abandon)\s+(all\s+)?"
+            r"(previous|prior|above|earlier|preceding)\s+instructions?\b",
+            re.I,
+        ),
     ),
     (
         "system-prompt-override",
-        re.compile(PROMPT_BOUNDARY_PREFIX + r"(system|developer)\s+(prompt|message|instruction)s?\b.*\b(override|replace|ignore)\b", re.I),
+        re.compile(
+            PROMPT_BOUNDARY_PREFIX
+            + r"(system|developer|admin)\s+(prompt|message|instruction|directive)s?\b"
+            r".*\b(override|replace|ignore|disregard)\b",
+            re.I,
+        ),
+    ),
+    (
+        "hidden-html",
+        re.compile(
+            r"<!--|<\s*(?:div|span)[^>]*(?:display\s*:\s*none|visibility\s*:\s*hidden)",
+            re.I,
+        ),
+    ),
+    (
+        "secret-exfiltration",
+        re.compile(
+            r"\b(curl|wget|fetch|requests?\.get)\b"
+            r".*\b(\.env|secret|token|api[_-]?key|password|credentials)\b",
+            re.I,
+        ),
+    ),
+    (
+        "secret-file-request",
+        re.compile(
+            r"\b(read|open|print|cat|get-content|type|more|less)\b"
+            r".*(\.env|secrets\.local\.json|id_rsa|\.ssh|api[_-]?key|credentials)\b",
+            re.I,
+        ),
+    ),
+    (
+        "private-key",
+        re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----", re.I),
+    ),
+    # -- extended patterns (search-result / general prompt-injection) --
+    (
+        "role-impersonation",
+        re.compile(
+            r"(?:you\s+are\s+now\s+|act\s+as\s+|pretend\s+(?:you\s+are|to\s+be)\s+|"
+            r"from\s+now\s+on\s+you\s+(?:are|will|must)\s+|your\s+new\s+role\s+is\s+|"
+            r"embody\s+the\s+role\s+of\s+|take\s+on\s+the\s+persona\s+of\s+)",
+            re.I,
+        ),
+    ),
+    (
+        "message-boundary-injection",
+        re.compile(
+            r"\b(?:System\s*:\s*|Human\s*:\s*|Assistant\s*:\s*|User\s*:\s*|AI\s*:\s*|"
+            r"\[INST\]|<<SYS>>|<\|system\|>|<\|endoftext\|>|"
+            r"<\|im_start\|>|<\|im_end\|>|</s>|<s>)",
+            re.I,
+        ),
+    ),
+    (
+        "instruction-continuation",
+        re.compile(
+            r"(?:new\s+instructions?\s*:|override\s*:|updated\s+instructions?\s*:|"
+            r"disregard\s+the\s+above|the\s+above\s+was\s+(?:wrong|incorrect)|"
+            r"corrected\s+instructions?\s*:|revised\s+instructions?\s*:)",
+            re.I,
+        ),
+    ),
+    (
+        "persona-hijack",
+        re.compile(
+            r"(?:you\s+are\s+an\s+AI\s+that\s+|you\s+have\s+been\s+(?:given|assigned)\s+"
+            r"(?:the\s+task\s+of|the\s+role\s+of)|your\s+only\s+(?:job|purpose|directive)\s+is\s+to|"
+            r"ignore\s+all\s+safety\s+(?:guidelines|rules|restrictions|filters)|"
+            r"bypass\s+(?:all\s+)?(?:safety|content|security)\s+(?:filters?|restrictions?|guidelines?))",
+            re.I,
+        ),
     ),
     ("hidden-html", re.compile(r"<!--|<\s*(?:div|span)[^>]*(?:display\s*:\s*none|visibility\s*:\s*hidden)", re.I)),
     ("secret-exfiltration", re.compile(r"\b(curl|wget|fetch)\b.*(?<!\w)(\.env|secret|token|api[_-]?key|password)\b", re.I)),
