@@ -33,6 +33,12 @@ from .chip_loader import PersonalityChip
 from .provider import ProviderSpec, call_provider
 
 
+# Pre-compiled JSON-extraction patterns for _parse_trait_response. This runs
+# on every trait-mutation LLM round-trip in the personality evolution loop.
+_TRAIT_FENCE_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL)
+_TRAIT_OPEN_BRACE_RE = re.compile(r"\{")
+
+
 MAX_DELTA_PER_TRAIT = 0.10
 MAX_DELTA_PER_EMOTIONAL_RANGE = 0.10
 TRAIT_FIELDS = (
@@ -174,10 +180,10 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
         return {}
     raw = text.strip()
     if raw.startswith("```"):
-        match = re.search(r"```(?:json)?\s*\n(.*?)```", raw, re.DOTALL)
+        match = _TRAIT_FENCE_RE.search(raw)
         if match:
             raw = match.group(1).strip()
-    open_match = re.search(r"\{", raw)
+    open_match = _TRAIT_OPEN_BRACE_RE.search(raw)
     if not open_match:
         return {}
     try:
