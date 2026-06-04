@@ -117,10 +117,20 @@ def main() -> int:
     rows = _load(history_path, limit=args.last)
 
     if args.json:
-        print(json.dumps({
+        payload = {
             "rows": rows,
             "summary": _summarize(rows, compare_back=args.compare_back),
-        }, indent=2))
+        }
+        # Well-known CLI UX pattern (jq, kubectl, gh): pretty-print when a
+        # human is at the terminal; emit compact single-line JSON when stdout
+        # is a pipe / file redirect so `| jq`, `| grep`, ndjson pipelines, and
+        # line-oriented shell loops can consume the trend without the extra
+        # whitespace from indent=2. JSON content is byte-equivalent on both
+        # branches; only whitespace differs.
+        if getattr(sys.stdout, "isatty", lambda: False)():
+            print(json.dumps(payload, indent=2))
+        else:
+            print(json.dumps(payload, separators=(",", ":")))
         return 0
 
     if not rows:
