@@ -28,6 +28,25 @@ EM_DASH_FAMILY = (
 )
 
 
+# Compile emphasis patterns once at import. strip_markdown_emphasis runs on
+# every LLM voice/chat output via sanitize_voice_output, so per-call
+# recompilation adds up across a chat session. Patterns are identical to the
+# previous inline literals.
+_TRIPLE_EMPHASIS_RE = re.compile(r"\*\*\*([^*\n][\s\S]*?[^*\n])\*\*\*")
+_BOLD_EMPHASIS_RE = re.compile(r"\*\*([^*\n][\s\S]*?[^*\n])\*\*")
+_UNDERSCORE_EMPHASIS_RE = re.compile(r"__([^_\n][\s\S]*?[^_\n])__")
+_STANDALONE_QUESTION_A_RE = re.compile(
+    r"\n?\s*[-*]?\s*Are you thinking this (?:runs locally as|should run locally as|should be) "
+    r"a standalone (?:page|app|tool),\s*or lives? inside the existing Spawner UI routes\?\s*$",
+    re.IGNORECASE,
+)
+_STANDALONE_QUESTION_B_RE = re.compile(
+    r"\n?\s*[-*]?\s*Should this be a standalone (?:page|app|tool),\s*"
+    r"or live inside the existing Spawner UI routes\?\s*$",
+    re.IGNORECASE,
+)
+
+
 def is_dash_punctuation(ch: str) -> bool:
     if ch == "-":
         return False
@@ -80,9 +99,9 @@ def strip_markdown_emphasis(text: str) -> str:
     """Remove paired bold/italic emphasis markers while preserving bullets."""
     if not text:
         return text
-    out = re.sub(r"\*\*\*([^*\n][\s\S]*?[^*\n])\*\*\*", r"\1", text)
-    out = re.sub(r"\*\*([^*\n][\s\S]*?[^*\n])\*\*", r"\1", out)
-    out = re.sub(r"__([^_\n][\s\S]*?[^_\n])__", r"\1", out)
+    out = _TRIPLE_EMPHASIS_RE.sub(r"\1", text)
+    out = _BOLD_EMPHASIS_RE.sub(r"\1", out)
+    out = _UNDERSCORE_EMPHASIS_RE.sub(r"\1", out)
     return out
 
 
@@ -102,20 +121,8 @@ def rewrite_spawner_surface_standalone_question(text: str) -> str:
         "which surface should we tighten first - Kanban state accuracy, Canvas execution state, "
         "or Telegram relay messaging?"
     )
-    out = re.sub(
-        r"\n?\s*[-*]?\s*Are you thinking this (?:runs locally as|should run locally as|should be) "
-        r"a standalone (?:page|app|tool),\s*or lives? inside the existing Spawner UI routes\?\s*$",
-        replacement,
-        text,
-        flags=re.IGNORECASE,
-    )
-    out = re.sub(
-        r"\n?\s*[-*]?\s*Should this be a standalone (?:page|app|tool),\s*"
-        r"or live inside the existing Spawner UI routes\?\s*$",
-        replacement,
-        out,
-        flags=re.IGNORECASE,
-    )
+    out = _STANDALONE_QUESTION_A_RE.sub(replacement, text)
+    out = _STANDALONE_QUESTION_B_RE.sub(replacement, out)
     return out
 
 
