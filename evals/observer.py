@@ -104,7 +104,17 @@ def _load_seen(path: Path) -> set[str]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return set(data.get("seen_trace_refs", []))
-    except Exception:
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        # Log before falling back to an empty dedup set so an operator can
+        # see why the observer is about to re-issue paid meta-LLM calls on
+        # every previously-observed trace_ref. Silent recovery here used to
+        # mask both torn-state-file crashes and operator-side edits.
+        print(
+            f"[observer] failed to load seen-trace state from {path}: "
+            f"{type(exc).__name__}: {exc}. Starting with empty dedup set; "
+            "previously-observed trace_refs will be re-processed.",
+            flush=True,
+        )
         return set()
 
 
