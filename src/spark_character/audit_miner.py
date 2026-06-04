@@ -134,6 +134,8 @@ class AuditMiner:
                 row = json.loads(raw)
             except json.JSONDecodeError:
                 continue
+            if not isinstance(row, dict):
+                continue
             if only_user and str(row.get("telegram_user_id") or "") != only_user:
                 continue
             rows.append(row)
