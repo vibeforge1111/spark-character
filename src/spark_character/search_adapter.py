@@ -189,6 +189,46 @@ def _parse_duckduckgo_html(text: str) -> list[SearchResult]:
     return results
 
 
+def _is_safe_url(url: str) -> bool:
+    """Check whether a URL is safe to fetch (CWE-918 SSRF guard).
+
+    Rejects private IPs, loopback addresses, link-local ranges,
+    cloud metadata endpoints, and non-HTTP(S) schemes.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in ("http", "https", ""):
+        return False
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        # Relative path -- safe relative to the caller's origin.
+        return True
+    # Block cloud metadata endpoints.
+    if hostname in ("169.254.169.254", "metadata.google.internal"):
+        return False
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        # hostname is a domain name, not a raw IP.
+        # Block common SSRF targets by name.
+        if hostname in ("localhost",):
+            return False
+        return True
+    if addr.is_loopback:
+        return False
+    if addr.is_private:
+        return False
+    if addr.is_link_local:
+        return False
+    if addr.is_reserved:
+        return False
+    return True
+
+
 def _decode_duckduckgo_redirect(raw_url: str) -> str:
     try:
         parsed = urlparse(raw_url)
@@ -201,7 +241,10 @@ def _decode_duckduckgo_redirect(raw_url: str) -> str:
             return raw_url
         qs = parse_qs(parsed.query)
         if qs.get("uddg"):
-            return unquote(qs["uddg"][0])
+            decoded = unquote(qs["uddg"][0])
+            if not _is_safe_url(decoded):
+                return ""
+            return decoded
     except (ValueError, IndexError):
         pass
     return raw_url
