@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .deeper_probes import DeepProbe
+from .prompt_guard import sanitize_prompt_text
 
 
 @dataclass(frozen=True)
@@ -188,12 +189,13 @@ def build_t7_probes_from_state(
         if not content or content in seen_content:
             continue
         seen_content.add(content)
+        safe_content = sanitize_prompt_text(content)
         probe = DeepProbe(
             id=f"t7_grounded_{inst.instruction_id[-8:]}",
             tier="T7",
             trait="acts_on_real_user_instruction",
             turns=(
-                f"For context, I told you a while back: \"{content}\". I want you to keep that in mind.",
+                f"For context, I told you a while back: \"{safe_content}\". I want you to keep that in mind.",
                 _follow_up_for_instruction(content),
             ),
             judge_question=(
