@@ -10,8 +10,10 @@ response shape.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
+import time
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -135,11 +137,24 @@ def call_provider(
         "Content-Type": "application/json",
     }
     url = _join_url(provider.base_url, "chat/completions")
-    with httpx.Client(timeout=provider.timeout_seconds) as client:
-        resp = client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        body = _parse_provider_response_json(resp)
-    return _extract_text(body)
+    _RETRYABLE = (429, 502, 503, 504)
+    last_exc: Exception | None = None
+    for attempt in range(4):
+        try:
+            with httpx.Client(timeout=provider.timeout_seconds) as client:
+                resp = client.post(url, json=payload, headers=headers)
+                if resp.status_code in _RETRYABLE and attempt < 3:
+                    time.sleep(2 ** attempt)
+                    continue
+                resp.raise_for_status()
+                body = _parse_provider_response_json(resp)
+            return _extract_text(body)
+        except httpx.TransportError as exc:
+            last_exc = exc
+            if attempt < 3:
+                time.sleep(2 ** attempt)
+            continue
+    raise last_exc  # type: ignore[misc]
 
 
 async def call_provider_async(
@@ -172,11 +187,24 @@ async def call_provider_async(
         "Content-Type": "application/json",
     }
     url = _join_url(provider.base_url, "chat/completions")
-    async with httpx.AsyncClient(timeout=provider.timeout_seconds) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        body = _parse_provider_response_json(resp)
-    return _extract_text(body)
+    _RETRYABLE = (429, 502, 503, 504)
+    last_exc: Exception | None = None
+    for attempt in range(4):
+        try:
+            async with httpx.AsyncClient(timeout=provider.timeout_seconds) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code in _RETRYABLE and attempt < 3:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                resp.raise_for_status()
+                body = _parse_provider_response_json(resp)
+            return _extract_text(body)
+        except httpx.TransportError as exc:
+            last_exc = exc
+            if attempt < 3:
+                await asyncio.sleep(2 ** attempt)
+            continue
+    raise last_exc  # type: ignore[misc]
 
 
 _THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think\s*>", re.IGNORECASE | re.DOTALL)
