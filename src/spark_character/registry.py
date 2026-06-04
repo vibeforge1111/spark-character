@@ -46,6 +46,23 @@ DEFAULT_LAB_PATH = Path(os.path.expanduser(
 ))
 
 
+def _atomic_write_text(target: Path, content: str) -> None:
+    """Write `content` to `target` atomically.
+
+    Writes to a per-process temp file in the same directory and then
+    `os.replace`s it onto `target`. If the process crashes or is killed
+    mid-write the canonical YAML is never replaced, so a partial file
+    can't break the chip lab registry on the next read.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = target.with_name(f".{target.name}.{os.getpid()}.tmp")
+    try:
+        temp_path.write_text(content, encoding="utf-8")
+        os.replace(temp_path, target)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
 def find_chip_lab_path() -> Path | None:
     """Locate the chip lab personalities directory if installed locally."""
     for p in default_chip_lab_paths():
@@ -119,9 +136,9 @@ def promote_evolved_persona_to_chip_lab(
     out["voice_rules_override"] = persona_markdown.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
+    _atomic_write_text(
+        target,
         yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
     )
     return target
 
@@ -173,8 +190,8 @@ def promote_evolved_chip_to_chip_lab(
         spec["voice_rules_override"] = voice_rules_override.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
+    _atomic_write_text(
+        target,
         yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
     )
     return target
