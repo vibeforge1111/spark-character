@@ -159,7 +159,16 @@ def main() -> int:
     digest = _digest(rows)
 
     if args.json:
-        print(json.dumps(digest, indent=2))
+        # Well-known CLI UX pattern (jq, kubectl, gh): pretty-print when a
+        # human is at the terminal; emit compact single-line JSON when stdout
+        # is a pipe / file redirect so `| jq`, `| grep`, ndjson pipelines, and
+        # line-oriented shell loops can consume the digest without the extra
+        # whitespace from indent=2. JSON content is byte-equivalent on both
+        # branches; only whitespace differs.
+        if getattr(sys.stdout, "isatty", lambda: False)():
+            print(json.dumps(digest, indent=2))
+        else:
+            print(json.dumps(digest, separators=(",", ":")))
         return 0
 
     if not rows:
