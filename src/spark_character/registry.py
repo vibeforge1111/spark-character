@@ -35,6 +35,7 @@ numbers, which is a separate evolution problem.
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,39 @@ def _personality_yaml_path(lab: Path, chip_id: str) -> Path:
     target = (root / f"{safe_chip_id}.personality.yaml").resolve()
     target.relative_to(root)
     return target
+
+
+
+def _atomic_write_yaml(target: Path, data: dict) -> None:
+    """Write YAML data to *target* atomically.
+
+    Uses a temporary file in the same directory and os.replace so
+    that a crash or power loss mid-write never leaves a corrupted file.
+    """
+    import yaml  # type: ignore
+
+    target_dir = target.parent
+    try:
+        fd, tmp_path = tempfile.mkstemp(
+            dir=target_dir,
+            prefix=target.stem,
+            suffix='.tmp',
+        )
+        tmp = Path(tmp_path)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as fh:
+                fh.write(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+            os.replace(str(tmp), str(target))
+        except BaseException:
+            # Clean up temp file on failure.
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+    except Exception:
+        # If we can't create a temp file at all, surface the original error.
+        raise
 
 
 def promote_evolved_persona_to_chip_lab(
@@ -119,10 +153,7 @@ def promote_evolved_persona_to_chip_lab(
     out["voice_rules_override"] = persona_markdown.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
-        yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
+    _atomic_write_yaml(target, out)
     return target
 
 
@@ -173,8 +204,5 @@ def promote_evolved_chip_to_chip_lab(
         spec["voice_rules_override"] = voice_rules_override.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
-        yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
+    _atomic_write_yaml(target, spec)
     return target
