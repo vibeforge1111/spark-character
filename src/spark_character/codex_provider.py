@@ -87,6 +87,13 @@ def call_codex(
         if not out_path.exists():
             raise RuntimeError("codex exec did not write the expected output file.")
         text = out_path.read_text(encoding="utf-8", errors="replace").strip()
+        if not text:
+            stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+            raise RuntimeError(
+                "codex exec exited 0 but produced an empty last-message file; "
+                "the caller cannot distinguish this from a successful empty reply. "
+                f"stderr tail: {stderr.strip()[:300]}"
+            )
         return text
 
 
