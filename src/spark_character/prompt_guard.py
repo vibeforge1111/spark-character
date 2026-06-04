@@ -16,6 +16,8 @@ INVISIBLE_UNICODE_CHARS = {
     "\u202c": "POP DIRECTIONAL FORMATTING",
     "\u202d": "LEFT-TO-RIGHT OVERRIDE",
     "\u202e": "RIGHT-TO-LEFT OVERRIDE",
+    "\u2028": "LINE SEPARATOR",
+    "\u2029": "PARAGRAPH SEPARATOR",
 }
 PROMPT_BOUNDARY_PREFIX = r"(?:^|[:\-]\s*)"
 STORED_PROMPT_INJECTION_PATTERNS = (
@@ -64,6 +66,10 @@ def sanitize_prompt_text(text: str) -> str:
     if not text:
         return text
     sanitized = text
+    # Collapse Unicode line/paragraph separators into a regular space so
+    # injection patterns cannot be split across pseudo-lines to evade
+    # per-line regex detection.
+    sanitized = sanitized.replace("\u2028", " ").replace("\u2029", " ")
     for char, name in INVISIBLE_UNICODE_CHARS.items():
         sanitized = sanitized.replace(char, _invisible_marker(char, name))
     output_lines: list[str] = []
