@@ -100,9 +100,11 @@ def search_results_for(
     """
     if not query.strip():
         return []
-    fn = search_fn or _duckduckgo_html_search
     try:
-        results = fn(query)
+        if search_fn is not None:
+            results = search_fn(query)
+        else:
+            results = _duckduckgo_html_search(query, timeout=timeout_seconds)
         return results[:max_results]
     except (httpx.HTTPError, OSError, ValueError) as exc:
         logger.warning("Live search failed; returning no results (%s).", type(exc).__name__)
@@ -153,7 +155,7 @@ def _safe_search_context_text(text: str) -> str:
     return sanitize_prompt_text(str(text or "")).strip()
 
 
-def _duckduckgo_html_search(query: str) -> list[SearchResult]:
+def _duckduckgo_html_search(query: str, timeout: float = 8.0) -> list[SearchResult]:
     """Default backend: DuckDuckGo HTML scrape. No auth, no key.
 
     Hits html.duckduckgo.com (the result-serving subdomain) with a
@@ -173,7 +175,7 @@ def _duckduckgo_html_search(query: str) -> list[SearchResult]:
             "Chrome/120.0 Safari/537.36"
         ),
     }
-    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
         resp = client.get(url, params={"q": query}, headers=headers)
         resp.raise_for_status()
         html_text = resp.text
