@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -182,7 +183,19 @@ def main() -> int:
     if promote and not args.dry_run:
         new_n = n + 1
         new_path = ARTIFACTS_DIR / f"persona.v{new_n}.md"
-        new_path.write_text(winner["text"], encoding="utf-8")
+        # Atomic temp+replace so a crash mid-write cannot leave persona.vN.md
+        # half-written before set_latest_persona_version flips the pointer at
+        # it. A torn artifact would silently degrade Spark's voice on the next
+        # load_persona() call.
+        tmp_path = new_path.with_name(f".{new_path.name}.{os.getpid()}.tmp")
+        try:
+            tmp_path.write_text(winner["text"], encoding="utf-8")
+            os.replace(tmp_path, new_path)
+        finally:
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
         set_latest_persona_version(
             f"v{new_n}",
             actor="evals/evolve.py",
