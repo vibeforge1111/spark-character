@@ -51,7 +51,9 @@ class DistinctivenessScore:
 def _load_corpus(path: Path) -> list[dict]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(data, dict):
         return []
     return list(data.get("entries") or [])
 
