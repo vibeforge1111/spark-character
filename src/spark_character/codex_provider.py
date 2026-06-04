@@ -15,6 +15,7 @@ those features, route through an HTTP-compatible backend.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,10 +23,71 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+# Directories from which user-supplied binary paths are allowed.
+_ALLOWED_BIN_DIRS: frozenset[str] = frozenset({
+    str(Path(p).resolve())
+    for p in (
+        "/usr/bin",
+        "/usr/local/bin",
+        "/usr/local/codex",
+    )
+    if Path(p).is_dir()
+})
+
+
+def _validate_binary(path: str) -> str:
+    """Resolve and validate a binary path from an environment variable.
+
+    Security constraints:
+    * The path must resolve to an existing, regular file.
+    * The file must be executable (``os.X_OK``).
+    * For **absolute** paths the directory must be in the allow-list.
+    * For **bare names** the binary must be discoverable via ``shutil.which()``
+      in the current ``$PATH`` and the resolved location must also pass
+      the directory check above.
+
+    Returns the resolved absolute path on success.
+    Raises ``ValueError`` with a descriptive message on failure.
+    """
+    if not path or not path.strip():
+        raise ValueError("codex binary path must not be empty")
+
+    candidate = Path(path)
+
+    # Bare command name (no /) — resolve via PATH.
+    if not candidate.is_absolute():
+        found = shutil.which(path)
+        if found is None:
+            raise ValueError(
+                f"codex binary '{path}' not found on $PATH"
+            )
+        candidate = Path(found)
+
+    resolved = candidate.resolve()
+
+    if not resolved.exists():
+        raise ValueError(f"codex binary does not exist: {resolved}")
+
+    if not resolved.is_file():
+        raise ValueError(f"codex binary path is not a regular file: {resolved}")
+
+    if not os.access(resolved, os.X_OK):
+        raise ValueError(f"codex binary is not executable: {resolved}")
+
+    parent = str(resolved.parent)
+    if parent not in _ALLOWED_BIN_DIRS:
+        raise ValueError(
+            f"codex binary directory '{parent}' is not in the "
+            f"allowed list: {sorted(_ALLOWED_BIN_DIRS)}"
+        )
+
+    return str(resolved)
+
+
 def _default_codex_binary() -> str:
     explicit = os.environ.get("CODEX_PATH") or os.environ.get("SPARK_CODEX_PATH")
     if explicit:
-        return explicit
+        return _validate_binary(explicit)
     if sys.platform.startswith("win"):
         return "codex.cmd"
     return "codex"
