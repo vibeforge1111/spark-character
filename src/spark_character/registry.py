@@ -116,6 +116,8 @@ def promote_evolved_persona_to_chip_lab(
         "promotion_result": "accepted",
         "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    if composite_score is not None:
+        out["spark_character_evolved"]["composite_score"] = composite_score
     out["voice_rules_override"] = persona_markdown.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
@@ -169,6 +171,10 @@ def promote_evolved_chip_to_chip_lab(
         "promotion_result": "accepted",
         "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    if composite_score is not None:
+        spec["spark_character_evolved"]["composite_score"] = composite_score
+    if delta_summary is not None:
+        spec["spark_character_evolved"]["delta_summary"] = delta_summary
     if voice_rules_override:
         spec["voice_rules_override"] = voice_rules_override.strip()
 
