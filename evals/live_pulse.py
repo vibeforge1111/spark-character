@@ -153,6 +153,10 @@ def main() -> int:
     out_path.write_text(json.dumps({"rows": rows, "means": means, "overall": overall_mean}, indent=2))
     print(f"\nFull transcript: {out_path}")
 
+    error_count = len(rows) - counted
+    if error_count:
+        print(f"ERRORS: {error_count}/{len(rows)} prompt(s) failed; gating non-zero regardless of mean.")
+        return 1
     return 0 if overall_mean >= 0.9 else 1
 
 
