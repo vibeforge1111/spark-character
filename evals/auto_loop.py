@@ -151,17 +151,26 @@ def _positive_int(value: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sib-home", required=True)
-    parser.add_argument("--interval-seconds", type=int, default=1800)
-    parser.add_argument("--new-replies-threshold", type=int, default=25)
-    parser.add_argument("--candidates", type=int, default=3)
-    parser.add_argument("--weights", default="0.2,0.5,0.3")
+    parser.add_argument("--sib-home", required=True,
+                        help="Path to a Spark Intelligence Builder home (e.g. ~/.spark/state/spark-intelligence). Required: the auto-loop reads its gateway-outbound.jsonl to count new replies and to seed evolve cycles.")
+    parser.add_argument("--interval-seconds", type=int, default=1800,
+                        help="Seconds to sleep between checks. Default 1800 = 30 minutes.")
+    parser.add_argument("--new-replies-threshold", type=int, default=25,
+                        help="Number of new live Telegram replies that must accumulate before firing an evolve cycle. Default 25.")
+    parser.add_argument("--candidates", type=int, default=3,
+                        help="Number of mutation candidates to generate per evolve cycle. Default 3.")
+    parser.add_argument("--weights", default="0.2,0.5,0.3",
+                        help="Comma-separated composite weights passed through to evolve_persona.py. Default 0.2,0.5,0.3 (T1,T2,T3).")
     parser.add_argument("--audit-limit", type=_positive_int, default=200, help="Number of recent audit failures to seed each evolve cycle (must be a positive integer)")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Print what would happen without running evolve_persona.py or writing a new persona.")
     parser.add_argument("--once", action="store_true", help="Run a single check then exit")
-    parser.add_argument("--state-file", default=str(STATE_FILE_DEFAULT))
-    parser.add_argument("--heartbeat-file", default=str(HEARTBEAT_FILE_DEFAULT))
-    parser.add_argument("--evolve-timeout", type=int, default=2400)
+    parser.add_argument("--state-file", default=str(STATE_FILE_DEFAULT),
+                        help="Where to persist the loop's run-counter / last-audit-count state. Default evals/_auto_loop_state.json.")
+    parser.add_argument("--heartbeat-file", default=str(HEARTBEAT_FILE_DEFAULT),
+                        help="Where to write the epoch+phase heartbeat each cycle. External monitors can watch the modtime. Default evals/_auto_loop_heartbeat.txt.")
+    parser.add_argument("--evolve-timeout", type=int, default=2400,
+                        help="Maximum seconds the inner evolve_persona.py subprocess may take before being killed. Default 2400 = 40 minutes.")
     parser.add_argument(
         "--consumer-pythons",
         default="",
