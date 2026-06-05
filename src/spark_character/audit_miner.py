@@ -178,13 +178,13 @@ def _detect_failures(text: str) -> list[tuple[str, str]]:
     matches = sorted({m.lower() for m in PLUMBING_PATTERN.findall(text)})
     if matches:
         out.append(("plumbing", ",".join(matches)))
-    if RESET_PATTERN.search(text):
-        match = RESET_PATTERN.search(text)
-        out.append(("reset", match.group(0)[:60] if match else ""))
+    reset_match = RESET_PATTERN.search(text)
+    if reset_match:
+        out.append(("reset", reset_match.group(0)[:60]))
     first = _first_sentence(text)
-    if HEDGE_PATTERN.search(first):
-        match = HEDGE_PATTERN.search(first)
-        out.append(("hedge_opener", match.group(0)[:60] if match else ""))
+    hedge_match = HEDGE_PATTERN.search(first)
+    if hedge_match:
+        out.append(("hedge_opener", hedge_match.group(0)[:60]))
     return out
 
 
