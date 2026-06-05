@@ -283,4 +283,16 @@ def chip_to_yaml_dict(chip: PersonalityChip) -> dict[str, Any]:
     if chip.emotional_triggers:
         emo["triggers"] = dict(chip.emotional_triggers)
     base["emotional_profile"] = emo
+    # Write back preferences that may have been mutated during evolution
+    prefs = dict(base.get("preferences", {}))
+    if chip.communication:
+        prefs["communication"] = dict(chip.communication)
+    if chip.decision_making:
+        prefs["decision_making"] = dict(chip.decision_making)
+    if chip.likes:
+        prefs["likes"] = list(chip.likes)
+    if chip.dislikes:
+        prefs["dislikes"] = list(chip.dislikes)
+    if prefs:
+        base["preferences"] = prefs
     return base
