@@ -10,6 +10,7 @@ it mutates the persona.
 """
 
 from __future__ import annotations
+import re
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +40,8 @@ class CritiqueResult:
 
 
 def load_critic(version: str = DEFAULT_CRITIC_VERSION) -> CriticSpec:
+    if not re.match(r"^[a-zA-Z0-9._-]+$", version):
+        raise ValueError(f"Invalid critic version: {version!r}")
     path = ARTIFACTS_DIR / f"critic.{version}.md"
     if not path.exists():
         raise FileNotFoundError(f"Critic artifact not found: {path}")
