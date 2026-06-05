@@ -340,6 +340,21 @@ def main() -> int:
         "t11_mean": t11_mean,
     }, indent=2))
     print(f"\nFull transcript: {args.out}")
+
+    error_count = (
+        sum(1 for r in t1_rows if "t1_mean" not in r)
+        + sum(1 for r in t3_rows if "score" not in r)
+        + sum(1 for r in t4_rows if "score" not in r)
+        + sum(1 for r in t6_rows if "score" not in r)
+        + sum(1 for r in t7_rows if "score" not in r)
+        + sum(1 for r in t8_rows if "score" not in r)
+        + sum(1 for r in t9_rows if "score" not in r)
+        + sum(1 for r in t11_rows if "score" not in r)
+    )
+    if error_count:
+        print(f"ERRORS: {error_count} probe(s) failed; gating non-zero regardless of mean.")
+        return 1
+
     base_pass = (
         t1_mean >= 0.95
         and t2_mean >= 0.6
