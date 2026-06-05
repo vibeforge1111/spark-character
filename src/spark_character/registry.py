@@ -35,11 +35,38 @@ numbers, which is a separate evolution problem.
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .chip_loader import PersonalityChip, default_chip_lab_paths, validate_chip_yaml_spec
+
+
+def _atomic_write_text(target: Path, content: str) -> None:
+    """Write a UTF-8 text file via tempfile + os.replace.
+
+    Promotion runs concurrently with chip-lab readers (the personality
+    engine loader at chip_loader.default_chip_lab_paths()); a bare
+    target.write_text leaves a half-written YAML on disk if the evolve
+    loop is interrupted, which the loader then reads as a YAML parse
+    error. Atomic write closes that window.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, raw_tmp = tempfile.mkstemp(dir=str(target.parent), prefix=f".{target.name}.", suffix=".tmp")
+    tmp = Path(raw_tmp)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(str(tmp), str(target))
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 DEFAULT_LAB_PATH = Path(os.path.expanduser(
     "~/Desktop/spark-personality-chip-labs/personalities"
@@ -119,9 +146,9 @@ def promote_evolved_persona_to_chip_lab(
     out["voice_rules_override"] = persona_markdown.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
+    _atomic_write_text(
+        target,
         yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
     )
     return target
 
@@ -173,8 +200,8 @@ def promote_evolved_chip_to_chip_lab(
         spec["voice_rules_override"] = voice_rules_override.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
+    _atomic_write_text(
+        target,
         yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
     )
     return target
