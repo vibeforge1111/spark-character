@@ -6,8 +6,8 @@ evolve_persona.py loop generates candidates with the LLM mutator;
 this skips that and scores two existing markdown specs directly.
 
 Usage:
-  python evals/compare_personas.py --baseline v5 --candidate v6
-  python evals/compare_personas.py --baseline v5 --candidate v6 \
+  python evals/compare_personas.py --baseline v7 --candidate v8
+  python evals/compare_personas.py --baseline v7 --candidate v8 \
       --weights 0.20,0.30,0.20,0.10,0.10,0.10
 """
 
@@ -139,8 +139,8 @@ def _positive_int(value: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--baseline", default="v5")
-    parser.add_argument("--candidate", default="v6")
+    parser.add_argument("--baseline", default="v7", help="Persona version to score as baseline (default: v7)")
+    parser.add_argument("--candidate", default="v8", help="Persona version to score as candidate (default: v8, current persona.latest)")
     parser.add_argument("--max-tokens", type=_positive_int, default=600,
                         help="Per-call max output tokens for the upstream LLM (must be a positive integer)")
     parser.add_argument(
