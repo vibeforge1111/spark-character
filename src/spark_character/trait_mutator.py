@@ -30,6 +30,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from .chip_loader import PersonalityChip
+from .prompt_guard import sanitize_prompt_text
 from .provider import ProviderSpec, call_provider
 
 
@@ -148,18 +149,23 @@ def mutate_trait_values(
 
 
 def _build_user_prompt(chip: PersonalityChip, weaknesses: list[str]) -> str:
+    safe_id = sanitize_prompt_text(str(chip.id))
+    safe_name = sanitize_prompt_text(str(chip.name))
+    safe_archetype = sanitize_prompt_text(str(chip.archetype))
+    safe_voice = sanitize_prompt_text(str(chip.voice_signature))
+    safe_empathy = sanitize_prompt_text(str(chip.empathy_style))
     return (
         "[Baseline personality chip]\n"
-        f"id: {chip.id}\n"
-        f"name: {chip.name}\n"
-        f"archetype: {chip.archetype}\n"
-        f"voice_signature: {chip.voice_signature}\n"
+        f"id: {safe_id}\n"
+        f"name: {safe_name}\n"
+        f"archetype: {safe_archetype}\n"
+        f"voice_signature: {safe_voice}\n"
         f"OCEAN: openness={chip.openness:.2f}, conscientiousness={chip.conscientiousness:.2f}, "
         f"extraversion={chip.extraversion:.2f}, agreeableness={chip.agreeableness:.2f}, "
         f"neuroticism={chip.neuroticism:.2f}\n"
         f"emotional_profile: self_awareness={chip.self_awareness:.2f}, "
         f"self_regulation={chip.self_regulation:.2f}, social_awareness={chip.social_awareness:.2f}, "
-        f"empathy_style={chip.empathy_style}\n"
+        f"empathy_style={safe_empathy}\n"
         f"emotional_range: {chip.emotional_range}\n"
         f"anti_patterns: {chip.anti_patterns[:5]}\n\n"
         "[Observed weaknesses on real model output]\n"
