@@ -10,11 +10,14 @@ response shape.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 import httpx
 
@@ -89,6 +92,7 @@ def _parse_provider_response_json(resp: httpx.Response) -> dict[str, Any]:
     try:
         body = resp.json()
     except ValueError as exc:
+        logger.exception("Provider returned non-JSON response")
         raise RuntimeError(f"Provider returned invalid JSON (status {resp.status_code}).") from exc
     if not isinstance(body, dict):
         raise RuntimeError("Provider JSON body must be an object.")

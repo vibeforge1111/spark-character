@@ -11,10 +11,13 @@ Stronger variant: pass a separate judge_provider.
 from __future__ import annotations
 
 import json
+import logging
 import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from .persona import ARTIFACTS_DIR
 from .provider import ProviderSpec, call_provider, call_provider_async
@@ -52,6 +55,7 @@ def _load_corpus(path: Path) -> list[dict]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        logger.exception("Failed to load voice corpus from %s", path)
         return []
     return list(data.get("entries") or [])
 
