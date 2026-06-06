@@ -272,8 +272,8 @@ class StabilityResult:
     scenario_id: str
     trait: str
     transcript: tuple[tuple[str, str], ...]  # (user, agent) per turn
-    score: float
-    raw: int
+    score: float | None
+    raw: int | None
     judge_response: str
 
 
@@ -324,19 +324,19 @@ def run_stability_scenario(
         scenario_id=scenario.id,
         trait=scenario.trait,
         transcript=tuple(transcript),
-        score=raw / 10.0,
+        score=raw / 10.0 if raw is not None else None,
         raw=raw,
         judge_response=judge_response,
     )
 
 
-def _parse_score(text: str) -> int:
+def _parse_score(text: str) -> int | None:
     if not text:
-        return 5
+        return None
     match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
     if match:
         return max(0, min(10, int(match.group(1))))
     digits = re.findall(r"\b([0-9]|10)\b", text)
     if digits:
         return max(0, min(10, int(digits[0])))
-    return 5
+    return None
