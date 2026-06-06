@@ -384,6 +384,8 @@ def main() -> int:
                 if run_full:
                     last_full = now
             except Exception as exc:
+                if run_full:
+                    last_full = now  # prevent repeated full evals on failure
                 print(f"[continuous_eval] eval error on {provider_name}: {exc}", flush=True)
                 traceback.print_exc()
                 _write_heartbeat(heartbeat_path, "error")
