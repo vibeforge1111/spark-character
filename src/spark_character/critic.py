@@ -99,6 +99,6 @@ def _interpret(draft: str, response: str) -> CritiqueResult:
     cleaned = response.strip()
     if not cleaned:
         return CritiqueResult(final=draft, rewritten=False, draft=draft)
-    if cleaned.strip().upper() == PASS_TOKEN:
+    if cleaned.strip().upper().startswith(PASS_TOKEN):
         return CritiqueResult(final=draft, rewritten=False, draft=draft)
     return CritiqueResult(final=cleaned, rewritten=True, draft=draft)
