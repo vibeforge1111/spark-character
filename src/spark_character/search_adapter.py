@@ -140,8 +140,9 @@ def attach_search_context(
         context_lines.append(f"{i}. {title}")
         if snippet:
             context_lines.append(f"   {snippet}")
-        if r.url:
-            context_lines.append(f"   source: {r.url}")
+        safe_url = _safe_search_context_url(r.url)
+        if safe_url:
+            context_lines.append(f"   source: {safe_url}")
     context_lines.append("</live_search_results>")
     context_lines.append("")
     context_lines.append("[User message]")
@@ -151,6 +152,23 @@ def attach_search_context(
 
 def _safe_search_context_text(text: str) -> str:
     return sanitize_prompt_text(str(text or "")).strip()
+
+
+def _safe_search_context_url(url: str) -> str:
+    """Sanitize an untrusted result URL before it is emitted into the
+    <live_search_results> prompt block.
+
+    SearchResult.url is attacker-influenced (it comes from the decoded
+    DuckDuckGo `uddg` redirect target), so a destination can embed
+    newlines and injected instructions. Route it through the same
+    sanitizer used for titles/snippets and collapse it to a single line
+    so smuggled newlines cannot break out of the `source:` line into the
+    surrounding prompt.
+    """
+    safe = _safe_search_context_text(url)
+    if not safe:
+        return ""
+    return safe.splitlines()[0].strip()
 
 
 def _duckduckgo_html_search(query: str) -> list[SearchResult]:
