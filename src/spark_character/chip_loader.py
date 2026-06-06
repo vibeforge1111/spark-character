@@ -92,22 +92,23 @@ class PersonalityChip:
     _raw: dict = field(default_factory=dict, repr=False)
 
 
-DEFAULT_CHIP_LAB_PATHS = (
-    Path(os.path.expanduser("~/.spark/modules/spark-personality-chip-labs/source/personalities")),
-    Path(os.path.expanduser("~/.spark/spark-personality-chip-labs/personalities")),
-    Path(os.path.expanduser("~/Desktop/spark-personality-chip-labs/personalities")),
-    Path("./personalities"),
-    Path(os.path.expanduser("~/.spark/personalities")),
+DEFAULT_CHIP_LAB_PATHS = tuple(
+    p for p in (
+        Path(os.path.expanduser('~/.spark/modules/spark-personality-chip-labs/source/personalities')),
+        Path(os.path.expanduser('~/.spark/spark-personality-chip-labs/personalities')),
+        Path(os.path.expanduser('~/Desktop/spark-personality-chip-labs/personalities')),
+        Path('./personalities'),
+        Path(os.path.expanduser('~/.spark/personalities')),
+    )
+    if p == Path('./personalities') or p.exists()
 )
 
 
 def default_chip_lab_paths() -> list[Path]:
-    """Return default chip search paths without unavailable or unreadable labs."""
+    """Return default chip search paths without unavailable desktop-only labs."""
     paths: list[Path] = []
     for path in DEFAULT_CHIP_LAB_PATHS:
         if "spark-personality-chip-labs" in path.parts and not path.exists():
-            continue
-        if path.exists() and not os.access(path, os.R_OK):
             continue
         paths.append(path)
     return paths
@@ -300,15 +301,6 @@ def load_chip(path: str | Path) -> PersonalityChip:
     return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
 
 
-def _safe_chip_id(value: str) -> str:
-    chip_id = str(value or "").strip()
-    if not chip_id:
-        raise ValueError("Personality chip id is required.")
-    if "/" in chip_id or "\\" in chip_id:
-        raise ValueError(f"Personality chip id must not contain path separators: {chip_id!r}")
-    return chip_id
-
-
 def load_chip_by_id(
     chip_id: str,
     *,
@@ -319,26 +311,22 @@ def load_chip_by_id(
 
     recoverable_load_errors = (OSError, ValueError, yaml.YAMLError)
     paths = search_paths or default_chip_lab_paths()
-    safe_chip_id = _safe_chip_id(chip_id)
     for base in paths:
         if not base.exists():
             continue
-        candidate = base / f"{safe_chip_id}.personality.yaml"
+        candidate = base / f"{chip_id}.personality.yaml"
         if candidate.exists():
-            try:
-                return load_chip(candidate)
-            except recoverable_load_errors as exc:
-                raise ValueError(f"Personality chip file is invalid: {candidate.name}") from exc
+            return load_chip(candidate)
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
             except recoverable_load_errors as exc:
                 logger.warning("Failed to load personality chip %s: %s", entry.name, exc)
                 continue
-            if chip.id == safe_chip_id:
+            if chip.id == chip_id:
                 return chip
     raise FileNotFoundError(
-        f"Personality chip '{safe_chip_id}' not found in: {[str(p) for p in paths]}"
+        f"Personality chip '{chip_id}' not found in: {[str(p) for p in paths]}"
     )
 
 
