@@ -28,6 +28,7 @@ v1 is preserved for diff or manual rollback.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
@@ -47,37 +48,38 @@ HEARTBEAT_FILE_DEFAULT = Path("evals/_auto_loop_heartbeat.txt")
 
 
 def _load_state(path: Path) -> dict:
+    _DEFAULT_STATE = {
+        "last_evolved_at": 0,
+        "last_audit_count": 0,
+        "last_persona_version": None,
+        "last_cycle_phase": "idle",
+        "last_cycle_started_at": 0,
+        "last_promoted_at": 0,
+        "loop_starts": 0,
+        "cycle_count": 0,
+        "promotion_count": 0,
+    }
     if not path.exists():
-        return {
-            "last_evolved_at": 0,
-            "last_audit_count": 0,
-            "last_persona_version": None,
-            "last_cycle_phase": "idle",
-            "last_cycle_started_at": 0,
-            "last_promoted_at": 0,
-            "loop_starts": 0,
-            "cycle_count": 0,
-            "promotion_count": 0,
-        }
+        return dict(_DEFAULT_STATE)
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        with open(path, "r", encoding="utf-8") as fh:
+            fcntl.flock(fh, fcntl.LOCK_SH)
+            try:
+                return json.loads(fh.read())
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
     except Exception:
-        return {
-            "last_evolved_at": 0,
-            "last_audit_count": 0,
-            "last_persona_version": None,
-            "last_cycle_phase": "idle",
-            "last_cycle_started_at": 0,
-            "last_promoted_at": 0,
-            "loop_starts": 0,
-            "cycle_count": 0,
-            "promotion_count": 0,
-        }
+        return dict(_DEFAULT_STATE)
 
 
 def _save_state(path: Path, state: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    with open(path, "w", encoding="utf-8") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            fh.write(json.dumps(state, indent=2))
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def _write_heartbeat(path: Path, phase: str) -> None:
