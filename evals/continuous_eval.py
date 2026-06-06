@@ -39,6 +39,7 @@ Soft-fails: any single eval error is logged and the loop continues.
 from __future__ import annotations
 
 import argparse
+import math
 import json
 import sys
 import time
@@ -158,7 +159,12 @@ def _load_history(history_path: Path, *, limit: int = 100) -> list[dict]:
 
 def _compute_baseline(history: list[dict], *, axis: str, last_n: int = 5) -> float | None:
     """Rolling mean over the last `last_n` runs that have this axis."""
-    values = [r.get(axis) for r in history[-last_n:] if isinstance(r.get(axis), (int, float))]
+    values = [
+        v
+        for r in history[-last_n:]
+        if isinstance((v := r.get(axis)), (int, float))
+        and not (isinstance(v, float) and math.isnan(v))
+    ]
     if not values:
         return None
     return round(mean_(values), 3)
