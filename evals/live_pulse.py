@@ -120,7 +120,7 @@ def main() -> int:
             },
             "dt_s": round(dt, 2),
         })
-        first_line = result.final.splitlines()[0] if result.final else "(empty)"
+        first_line = (result.final.splitlines() or ["(empty)"])[0]
         flags = _flags(score)
         marker = " [REWRITTEN]" if result.rewritten else ""
         print(f"[{label}] dt={dt:.1f}s mean={score.mean}{marker}")
