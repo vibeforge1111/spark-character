@@ -230,7 +230,14 @@ def main() -> int:
                 print("[auto_loop] threshold not met, skipping")
             if args.once:
                 return 0
-            time.sleep(max(60, args.interval_seconds))
+            actual_interval = max(60, args.interval_seconds)
+            if actual_interval != args.interval_seconds:
+                print(
+                    f"[auto_loop] --interval-seconds={args.interval_seconds} "
+                    f"clamped to floor 60s",
+                    flush=True,
+                )
+            time.sleep(actual_interval)
         except KeyboardInterrupt:
             print("[auto_loop] interrupted by operator")
             return 0
