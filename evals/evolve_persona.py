@@ -115,7 +115,11 @@ def find_latest_persona() -> tuple[int, PersonaSpec]:
         if match:
             versions.append((int(match.group(1)), path))
     if not versions:
-        raise FileNotFoundError("No persona.vN.md artifacts found.")
+        raise FileNotFoundError(
+            f"No persona.vN.md artifacts found in {ARTIFACTS_DIR}. "
+            f"Seed persona.v1.md in that directory before running evolve_persona, "
+            f"or override the location via ARTIFACTS_DIR before launching."
+        )
     versions.sort(key=lambda x: x[0])
     n, path = versions[-1]
     text = path.read_text(encoding="utf-8")
