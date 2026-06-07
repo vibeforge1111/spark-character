@@ -98,8 +98,8 @@ def count_llm_replies(sib_home: str) -> int:
     return findings.llm_rows
 
 
-def run_evolve_cycle(args, repo_root: Path) -> tuple[bool, str]:
-    """Run evolve_persona.py as a subprocess. Return (promoted, log_tail)."""
+def run_evolve_cycle(args, repo_root: Path) -> tuple[bool, bool, str]:
+    """Run evolve_persona.py as a subprocess. Return (success, promoted, log_tail)."""
     cmd = [
         sys.executable, "-u",
         str(repo_root / "evals" / "evolve_persona.py"),
@@ -116,10 +116,10 @@ def run_evolve_cycle(args, repo_root: Path) -> tuple[bool, str]:
     if result.returncode != 0:
         print("[auto_loop] evolve subprocess returned non-zero")
         print(log_tail)
-        return False, log_tail
+        return False, False, log_tail
     print(log_tail)
     promoted = "PROMOTED:" in result.stdout
-    return promoted, log_tail
+    return True, promoted, log_tail
 
 
 def maybe_refresh_consumers(args) -> None:
@@ -200,7 +200,15 @@ def main() -> int:
                 state["cycle_count"] = int(state.get("cycle_count", 0)) + 1
                 _save_state(state_path, state)
                 _write_heartbeat(heartbeat_path, "evolving")
-                promoted, _log = run_evolve_cycle(args, repo_root)
+                success, promoted, _log = run_evolve_cycle(args, repo_root)
+                if not success:
+                    print("[auto_loop] evolve cycle failed, not advancing audit cursor")
+                    state["last_cycle_phase"] = "idle"
+                    _save_state(state_path, state)
+                    if args.once:
+                        return 1
+                    time.sleep(60)
+                    continue
                 state["last_evolved_at"] = int(time.time())
                 state["last_audit_count"] = current
                 state["last_persona_version"] = resolve_latest_persona_version()
