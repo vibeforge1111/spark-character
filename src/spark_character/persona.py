@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -106,7 +107,7 @@ def set_latest_persona_version(
     pointer_path.parent.mkdir(parents=True, exist_ok=True)
     if pointer_path.exists():
         os.chmod(pointer_path, 0o666)
-    temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
+    temp_path = pointer_path.with_name(f".{pointer_path.name}.{secrets.token_hex(8)}.tmp")
     temp_path.write_text(f"{resolved}\n", encoding="utf-8")
     os.replace(temp_path, pointer_path)
     protect_latest_pointer(pointer_path)
