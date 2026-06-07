@@ -168,50 +168,33 @@ def score_all_tiers(
                 if t1.p4_lead < 1.0: tags.append("hedge")
                 if t1.p5_voice < 1.0: tags.append(f"voice={t1.p5_voice}")
                 failures_t1.append(f"on prompt {prompt!r}: {' '.join(tags)}")
-            try:
-                t2 = score_distinctiveness(result.final, provider=provider)
-                t2_scores.append(t2.score)
-                if t2.score < 0.7:
-                    failures_t2.append((prompt, t2.score, result.final[:200]))
-            except Exception:
-                pass
-        except Exception:
-            pass
+            t2 = score_distinctiveness(result.final, provider=provider)
+            t2_scores.append(t2.score)
+            if t2.score < 0.7:
+                failures_t2.append((prompt, t2.score, result.final[:200]))
 
     for probe in PROBES:
-        try:
-            r = run_probe(probe, provider=provider, persona=persona)
-            t3_scores.append(r.score)
-            if r.score < 0.8:
-                failures_t3.append((probe.id, r.score))
-        except Exception:
-            pass
+        r = run_probe(probe, provider=provider, persona=persona)
+        t3_scores.append(r.score)
+        if r.score < 0.8:
+            failures_t3.append((probe.id, r.score))
 
     if include_deeper:
         for probe in T6_EMOTIONAL_ATTUNEMENT_PROBES:
-            try:
-                r = run_deep_probe(probe, provider=provider, persona=persona)
-                t6_scores.append(r.score)
-                if r.score < 0.8:
-                    failures_t6.append((probe.id, r.score))
-            except Exception:
-                pass
+            r = run_deep_probe(probe, provider=provider, persona=persona)
+            t6_scores.append(r.score)
+            if r.score < 0.8:
+                failures_t6.append((probe.id, r.score))
         for probe in T7_MEMORY_COHERENCE_PROBES:
-            try:
-                r = run_deep_probe(probe, provider=provider, persona=persona)
-                t7_scores.append(r.score)
-                if r.score < 0.8:
-                    failures_t7.append((probe.id, r.score))
-            except Exception:
-                pass
+            r = run_deep_probe(probe, provider=provider, persona=persona)
+            t7_scores.append(r.score)
+            if r.score < 0.8:
+                failures_t7.append((probe.id, r.score))
         for probe in T8_INITIATIVE_PROBES:
-            try:
-                r = run_deep_probe(probe, provider=provider, persona=persona)
-                t8_scores.append(r.score)
-                if r.score < 0.8:
-                    failures_t8.append((probe.id, r.score))
-            except Exception:
-                pass
+            r = run_deep_probe(probe, provider=provider, persona=persona)
+            t8_scores.append(r.score)
+            if r.score < 0.8:
+                failures_t8.append((probe.id, r.score))
 
     return {
         "t1_mean": round(mean_(t1_means), 3) if t1_means else 0.0,
