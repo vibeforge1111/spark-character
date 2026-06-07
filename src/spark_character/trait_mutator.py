@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import re
 from dataclasses import dataclass, replace
 from typing import Any
@@ -180,6 +181,9 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
     if not open_match:
         return {}
     try:
+        try:
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid JSON (trait_mutator.py)") from exc
         return json.loads(raw[open_match.start():])
     except json.JSONDecodeError:
         depth = 0
@@ -212,6 +216,8 @@ def _clamp_dict(
         try:
             v = float(raw_val)
         except (TypeError, ValueError):
+            continue
+        if not math.isfinite(v):
             continue
         v = max(-max_delta, min(max_delta, v))
         if v != 0.0:
