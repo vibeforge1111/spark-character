@@ -192,7 +192,7 @@ def fire_evolution(
                 subprocess.run(
                     [py, "-m", "pip", "install", "--upgrade", "--force-reinstall",
                      "--no-deps",
-                     "git+https://github.com/vibeforge1111/spark-character.git@master",
+                     "git+https://github.com/vibeforge1111/spark-character.git@11c1d2da976b114e1320ff80a30c67c11f885913",
                      "-q"],
                     timeout=180,
                     check=False,
