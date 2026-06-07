@@ -85,7 +85,10 @@ def call_codex(
             stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
             raise RuntimeError(f"codex exec failed (rc={result.returncode}): {stderr.strip()[:300]}")
         if not out_path.exists():
-            raise RuntimeError("codex exec did not write the expected output file.")
+            raise RuntimeError(
+                f"codex exec did not write the expected output file at {out_path}. "
+                f"Check codex binary version, sandbox/policy settings, or rerun with --debug to inspect the exec."
+            )
         text = out_path.read_text(encoding="utf-8", errors="replace").strip()
         return text
 
