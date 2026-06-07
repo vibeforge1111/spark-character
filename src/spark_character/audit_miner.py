@@ -18,7 +18,7 @@ Limitations:
   because their text is hand-written and not voice-evolvable.
 
 Usage:
-    miner = AuditMiner.from_sib_home("C:/Users/.../<home>")
+    miner = AuditMiner.from_sib_home(Path.home() / ".spark" / "sib-home")
     findings = miner.recent_findings(limit=50)
     print(findings.summary())
 """
@@ -31,8 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .output_sanitizer import EM_DASH_FAMILY
 from .scoring import (
-    EM_DASH,
     HEDGE_PATTERN,
     PLUMBING_PATTERN,
     RESET_PATTERN,
@@ -131,7 +131,10 @@ class AuditMiner:
             if not raw:
                 continue
             try:
-                row = json.loads(raw)
+                try:
+                    row = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    raise ValueError("Invalid JSON (audit_miner.py)") from exc
             except json.JSONDecodeError:
                 continue
             if only_user and str(row.get("telegram_user_id") or "") != only_user:
@@ -167,8 +170,9 @@ class AuditMiner:
 
 def _detect_failures(text: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
-    if EM_DASH in text:
-        out.append(("em_dash", f"{text.count(EM_DASH)} occurrences"))
+    dash_count = sum(text.count(ch) for ch in EM_DASH_FAMILY)
+    if dash_count:
+        out.append(("em_dash", f"{dash_count} occurrences"))
     markdown_matches = MARKDOWN_EMPHASIS_PATTERN.findall(text)
     if markdown_matches:
         out.append(("markdown_emphasis", f"{len(markdown_matches)} markdown emphasis markers"))
