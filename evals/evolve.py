@@ -194,7 +194,9 @@ def main() -> int:
     else:
         print("\nNO PROMOTION: baseline still wins.")
 
-    Path(args.out).write_text(
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
         json.dumps({
             "baseline_version": n,
             "baseline_overall": baseline_overall,
