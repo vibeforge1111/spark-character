@@ -111,9 +111,10 @@ def _write_heartbeat(path: Path, phase: str) -> None:
 
 def find_lowest_tier(history: list[dict], *, min_runs: int) -> tuple[str | None, float, int]:
     """Return (axis, mean_score, n_samples) for the weakest tier with
-    at least min_runs samples. Returns (None, 1.0, 0) if nothing
-    qualifies."""
-    weakest = (None, 1.0, 0)
+    at least min_runs samples. Returns (None, inf, 0) if nothing
+    qualifies. A perfect-1.0 tier still qualifies as the weakest when
+    all eligible axes tie at the ceiling."""
+    weakest: tuple[str | None, float, int] = (None, float("inf"), 0)
     for axis in TIER_KEYS:
         values = [r.get(axis) for r in history if isinstance(r.get(axis), (int, float))]
         if len(values) < min_runs:
