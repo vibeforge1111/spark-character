@@ -49,7 +49,7 @@ def build_run_fn(
     temperature: float = 0.7,
 ) -> RunFn:
     p = persona or load_persona(provider_kind=detect_provider_kind(provider))
-    c = critic if (critic is not None or not use_critic) else load_critic()
+    c = critic if critic is not None else (load_critic() if use_critic else None)
 
     async def _run(prompt: str) -> HarnessResult:
         if use_critic and c is not None:
