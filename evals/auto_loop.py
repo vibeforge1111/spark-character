@@ -126,7 +126,7 @@ def maybe_refresh_consumers(args) -> None:
     if not args.consumer_pythons:
         return
     pythons = [p.strip() for p in args.consumer_pythons.split(",") if p.strip()]
-    pkg_url = "git+https://github.com/vibeforge1111/spark-character.git@master"
+    pkg_url = "git+https://github.com/vibeforge1111/spark-character.git@11c1d2da976b114e1320ff80a30c67c11f885913"
     for py in pythons:
         try:
             print(f"[auto_loop] refreshing consumer: {py}", flush=True)
