@@ -3,9 +3,14 @@
 T1: surface mechanics (em dash, plumbing, reset, hedge, voice heuristic)
 T2: distinctiveness (LLM judge against golden vs foil corpus)
 T3: behavioral probes (per-trait LLM judge on scripted scenarios)
+T4: multi-turn adversarial stability
+T6: emotional attunement | T7: memory coherence
+T8: initiative           | T9: aesthetic fingerprint
+T11: sustained-attack stability (opt-in via --include-sustained)
 
 Prints a tiered scorecard and writes the full transcript to disk.
-Exit code 0 if T1 mean >= 0.95 and T2 mean >= 0.6 and T3 mean >= 0.6.
+Exit code 0 if T1 mean >= 0.95 and T2/T3/T4/T6/T7/T8/T9 means each >= 0.6
+(plus T11 mean >= 0.6 when --include-sustained is set). Else exit 1.
 """
 
 from __future__ import annotations
