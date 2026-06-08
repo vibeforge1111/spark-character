@@ -329,12 +329,15 @@ def load_chip_by_id(
                 return load_chip(candidate)
             except recoverable_load_errors as exc:
                 raise ValueError(f"Personality chip file is invalid: {candidate.name}") from exc
+        loaded_chips: list[PersonalityChip] = []
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
             except recoverable_load_errors as exc:
                 logger.warning("Failed to load personality chip %s: %s", entry.name, exc)
                 continue
+            loaded_chips.append(chip)
+        for chip in loaded_chips:
             if chip.id == safe_chip_id:
                 return chip
     raise FileNotFoundError(
