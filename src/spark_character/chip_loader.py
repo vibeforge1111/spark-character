@@ -329,7 +329,7 @@ def load_chip_by_id(
                 return load_chip(candidate)
             except recoverable_load_errors as exc:
                 raise ValueError(f"Personality chip file is invalid: {candidate.name}") from exc
-        for entry in base.glob("*.personality.yaml"):
+        for entry in sorted(base.glob("*.personality.yaml")):
             try:
                 chip = load_chip(entry)
             except recoverable_load_errors as exc:
