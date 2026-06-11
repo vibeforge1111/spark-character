@@ -56,7 +56,7 @@ def test_load_chip_validates_and_coerces_yaml(tmp_path: Path, monkeypatch: pytes
     chip = load_fallback_chip(path, monkeypatch)
 
     assert chip.id == "founder-operator"
-    assert chip.name == "Founder Operator Canary"
+    assert chip.name == "Founder Operator"
     assert chip.openness == 0.72
     assert chip.empathy_style == "directive"
     assert chip.emotional_range["curiosity"] == 0.91
