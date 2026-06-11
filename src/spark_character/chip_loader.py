@@ -329,14 +329,17 @@ def load_chip_by_id(
                 return load_chip(candidate)
             except recoverable_load_errors as exc:
                 raise ValueError(f"Personality chip file is invalid: {candidate.name}") from exc
+        found: PersonalityChip | None = None
         for entry in base.glob("*.personality.yaml"):
             try:
                 chip = load_chip(entry)
             except recoverable_load_errors as exc:
                 logger.warning("Failed to load personality chip %s: %s", entry.name, exc)
                 continue
-            if chip.id == safe_chip_id:
-                return chip
+            if chip.id == safe_chip_id and found is None:
+                found = chip
+        if found is not None:
+            return found
     raise FileNotFoundError(
         f"Personality chip '{safe_chip_id}' not found in: {[str(p) for p in paths]}"
     )
