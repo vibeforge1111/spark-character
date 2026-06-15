@@ -162,7 +162,12 @@ def validate_chip_yaml_spec(spec: Any) -> dict[str, Any]:
     identity = _require_mapping(root.get("identity"), "identity")
     for key in ("id", "name"):
         if not isinstance(identity.get(key), str) or not identity.get(key, "").strip():
-            raise ValueError(f"Personality chip field identity.{key} must be a non-empty string.")
+            got = type(identity.get(key)).__name__
+            example_value = "founder-operator" if key == "id" else "Founder Operator"
+            raise ValueError(
+                f"Personality chip field identity.{key} must be a non-empty string "
+                f"(got {got}). Example: identity.{key} = {example_value!r}."
+            )
     for key in ("archetype", "voice_signature", "tagline"):
         if key in identity and identity[key] is not None and not isinstance(identity[key], str):
             raise ValueError(f"Personality chip field identity.{key} must be a string.")
