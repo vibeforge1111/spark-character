@@ -68,7 +68,7 @@ class UserStateObservation:
 def _open_state(sib_home: str | Path) -> sqlite3.Connection:
     db = Path(sib_home) / "state.db"
     if not db.exists():
-        raise FileNotFoundError(f"state.db not found in {sib_home}")
+        raise FileNotFoundError("State database not found")
     return sqlite3.connect(str(db))
 
 
