@@ -15,11 +15,47 @@ those features, route through an HTTP-compatible backend.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+# Hardcoded allowlist of expected codex binary names.
+# Only these basenames (after stripping platform extensions) are permitted.
+_ALLOWED_CODEX_BINARY_NAMES: frozenset[str] = frozenset(["codex", "spark-codex"])
+
+
+def _resolve_codex_binary(candidate: str) -> str:
+    """Resolve and validate a codex binary path against the allowlist.
+
+    Accepts a bare name (looked up via shutil.which) or an absolute/relative
+    path. Raises ValueError if the resolved binary name is not in the allowlist
+    so that env-var-injected paths like /bin/bash or /bin/rm are rejected.
+    """
+    basename = Path(candidate).name
+    # Strip common platform extensions (.cmd, .exe, .bat) before allowlist check.
+    for ext in (".cmd", ".exe", ".bat"):
+        if basename.lower().endswith(ext):
+            basename = basename[: -len(ext)]
+            break
+
+    if basename not in _ALLOWED_CODEX_BINARY_NAMES:
+        raise ValueError(
+            f"Codex binary {candidate!r} is not in the allowlist of permitted binary names "
+            f"({', '.join(sorted(_ALLOWED_CODEX_BINARY_NAMES))}). "
+            "Set CODEX_PATH or SPARK_CODEX_PATH to 'codex' or 'spark-codex'."
+        )
+
+    # Resolve the actual binary path via PATH lookup.
+    resolved = shutil.which(candidate)
+    if resolved is None:
+        raise FileNotFoundError(
+            f"Codex binary {candidate!r} not found on PATH. "
+            "Install codex or spark-codex before using the codex provider."
+        )
+    return resolved
 
 
 def _default_codex_binary() -> str:
@@ -64,10 +100,11 @@ def call_codex(
     equivalent for short conversational turns.
     """
     combined = f"{system_prompt.strip()}\n\nUser message:\n{user_prompt.strip()}"
+    binary = _resolve_codex_binary(spec.binary)
     with tempfile.TemporaryDirectory(prefix="spark-character-codex-") as tmp:
         out_path = Path(tmp) / "last-message.txt"
         cmd = [
-            spec.binary,
+            binary,
             "exec",
             "--skip-git-repo-check",
             "--model", spec.model,
@@ -93,9 +130,10 @@ def call_codex(
 def codex_available(spec: CodexSpec | None = None) -> bool:
     s = spec or CodexSpec()
     try:
+        binary = _resolve_codex_binary(s.binary)
         result = subprocess.run(
-            [s.binary, "--version"], capture_output=True, timeout=5
+            [binary, "--version"], capture_output=True, timeout=5
         )
         return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+    except (FileNotFoundError, ValueError, subprocess.TimeoutExpired, PermissionError):
         return False
