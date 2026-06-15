@@ -43,6 +43,7 @@ import json
 import sys
 import time
 import traceback
+from collections import deque
 from pathlib import Path
 from statistics import mean as mean_
 
@@ -141,19 +142,27 @@ def _append_history(history_path: Path, row: dict) -> None:
 
 
 def _load_history(history_path: Path, *, limit: int = 100) -> list[dict]:
+    """Load the last *limit* rows from a JSONL history file.
+
+    Uses a bounded deque so the entire file is streamed without
+    accumulating all rows in memory first (the file grows one row
+    per eval cycle and runs 24/7).
+    """
     if not history_path.exists():
         return []
-    rows: list[dict] = []
+    buf: deque[str] = deque(maxlen=limit)
     with history_path.open("r", encoding="utf-8") as f:
         for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rows.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    return rows[-limit:]
+            stripped = line.strip()
+            if stripped:
+                buf.append(stripped)
+    rows: list[dict] = []
+    for raw in buf:
+        try:
+            rows.append(json.loads(raw))
+        except json.JSONDecodeError:
+            continue
+    return rows
 
 
 def _compute_baseline(history: list[dict], *, axis: str, last_n: int = 5) -> float | None:
