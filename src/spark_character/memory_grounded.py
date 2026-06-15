@@ -69,7 +69,7 @@ def _open_state(sib_home: str | Path) -> sqlite3.Connection:
     db = Path(sib_home) / "state.db"
     if not db.exists():
         raise FileNotFoundError(f"state.db not found in {sib_home}")
-    return sqlite3.connect(str(db))
+    return sqlite3.connect(str(db), timeout=10)
 
 
 def latest_user_instructions(
