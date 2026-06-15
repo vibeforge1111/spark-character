@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .chip_loader import PersonalityChip, default_chip_lab_paths, validate_chip_yaml_spec
+from .chip_loader import PersonalityChip, validate_chip_yaml_spec
 
 DEFAULT_LAB_PATH = Path(os.path.expanduser(
     "~/Desktop/spark-personality-chip-labs/personalities"
@@ -48,21 +48,15 @@ DEFAULT_LAB_PATH = Path(os.path.expanduser(
 
 def find_chip_lab_path() -> Path | None:
     """Locate the chip lab personalities directory if installed locally."""
-    for p in default_chip_lab_paths():
+    candidates = [
+        DEFAULT_LAB_PATH,
+        Path("./personalities"),
+        Path(os.path.expanduser("~/.spark/personalities")),
+    ]
+    for p in candidates:
         if p.exists() and p.is_dir():
             return p
     return None
-
-
-def _personality_yaml_path(lab: Path, chip_id: str) -> Path:
-    """Build a chip YAML path without allowing chip ids to escape the lab."""
-    safe_chip_id = str(chip_id or "").strip()
-    if not safe_chip_id:
-        raise ValueError("Personality chip id is required.")
-    root = lab.resolve()
-    target = (root / f"{safe_chip_id}.personality.yaml").resolve()
-    target.relative_to(root)
-    return target
 
 
 def promote_evolved_persona_to_chip_lab(
@@ -89,15 +83,13 @@ def promote_evolved_persona_to_chip_lab(
     if lab is None:
         return None
 
-    base_yaml_path = _personality_yaml_path(lab, base_chip_id)
+    base_yaml_path = lab / f"{base_chip_id}.personality.yaml"
     base_spec: dict[str, Any] = {}
     if base_yaml_path.exists():
         try:
             base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
-        except (OSError, ValueError, yaml.YAMLError) as exc:
-            raise ValueError(
-                f"Base personality chip YAML is invalid: {base_yaml_path.name}"
-            ) from exc
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as _exc:
+            base_spec = {}
 
     # Carry everything from the base chip forward, then mark this as an
     # evolved variant and embed the new voice rules.
@@ -118,7 +110,7 @@ def promote_evolved_persona_to_chip_lab(
     }
     out["voice_rules_override"] = persona_markdown.strip()
 
-    target = _personality_yaml_path(lab, new_chip_id)
+    target = lab / f"{new_chip_id}.personality.yaml"
     target.write_text(
         yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
         encoding="utf-8",
@@ -172,7 +164,7 @@ def promote_evolved_chip_to_chip_lab(
     if voice_rules_override:
         spec["voice_rules_override"] = voice_rules_override.strip()
 
-    target = _personality_yaml_path(lab, new_chip_id)
+    target = lab / f"{new_chip_id}.personality.yaml"
     target.write_text(
         yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
         encoding="utf-8",
