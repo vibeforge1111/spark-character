@@ -1,0 +1,84 @@
+{
+  "schema": "spark-compete-hotfix-v1",
+  "event": "spark-compete-first-event",
+  "submission_mode": "public_repo_pr",
+  "submission_target_url": "https://github.com/vibeforge1111/spark-character/pull/286",
+  "team": {
+    "name": "esc1200",
+    "members": ["drophub_sir", "esc1200", "hermes-agent"],
+    "llm_device_holder": "esc1200",
+    "device_holder_github": "https://github.com/Esc1200",
+    "github_accounts": ["Esc1200"]
+  },
+  "target_repo": {
+    "id": "vibeforge1111/spark-character",
+    "source": "https://github.com/vibeforge1111/spark-character",
+    "owner_surface": "spark-character"
+  },
+  "issue": {
+    "type": "bug",
+    "severity": "medium",
+    "title": "chip_loader.py and persona.py FileNotFoundError messages leak internal filesystem paths",
+    "actual_behavior": "chip_loader.py line 341 raises FileNotFoundError with the full list of search directories embedded in the message: f\"Personality chip '{safe_chip_id}' not found in: {[str(p) for p in paths]}\". persona.py lines 105 and 183 raise FileNotFoundError with the full absolute path to the persona artifact file. These messages expose internal directory structure and filesystem layout to callers.",
+    "expected_behavior": "Error messages should identify which chip or artifact was not found without revealing internal search paths or filesystem locations. The chip ID and artifact filename are sufficient for debugging.",
+    "repro_steps": [
+      "Read src/spark_character/chip_loader.py and locate the FileNotFoundError at line ~341.",
+      "Observe the error message includes {[str(p) for p in paths]} which dumps all search directories.",
+      "Read src/spark_character/persona.py lines ~105 and ~183.",
+      "Observe the error messages include full artifact paths (e.g., /absolute/path/to/persona.2026.01.md)."
+    ],
+    "affected_workflow": "Character chip loading and persona resolution in the Spark character runtime"
+  },
+  "evidence": {
+    "safe_links_only": true,
+    "before_after_proof": "BEFORE (master): chip_loader.py line 341 raises FileNotFoundError with all search paths: f\"Personality chip '{safe_chip_id}' not found in: {[str(p) for p in paths]}\". persona.py line 105 raises with full artifact_path. persona.py line 183 raises with full path.\n\nAFTER (PR branch): chip_loader.py raises FileNotFoundError with chip ID only: f\"Personality chip '{safe_chip_id}' not found\". persona.py lines 105 and 183 raise with filename only: f\"Persona artifact not found: persona.{resolved}.md\".",
+    "links": [
+      "https://github.com/vibeforge1111/spark-character/pull/286",
+      "https://github.com/vibeforge1111/spark-character/blob/master/src/spark_character/chip_loader.py",
+      "https://github.com/vibeforge1111/spark-character/blob/master/src/spark_character/persona.py"
+    ],
+    "forbidden": [
+      "Do not claim merge approval",
+      "Do not claim CI passed unless verified",
+      "Do not fabricate test output"
+    ]
+  },
+  "proposed_fix": {
+    "approach": "Replace verbose path-containing error messages with generic messages that identify only the missing resource. In chip_loader.py, remove the {[str(p) for p in paths]} list comprehension from the FileNotFoundError message. In persona.py, replace the full artifact_path / path variables with just the filename (persona.{resolved}.md) in both FileNotFoundError messages.",
+    "files_expected": [
+      "src/spark_character/chip_loader.py",
+      "src/spark_character/persona.py"
+    ],
+    "tests_or_smoke": "All existing tests pass. The changes are purely cosmetic to error message strings and do not affect control flow."
+  },
+  "pr": {
+    "branch": "esc1200/fix/chip-loader-path-leak",
+    "title_prefix": "[spark-compete]",
+    "author_github": "Esc1200",
+    "body_must_include": [
+      "packet",
+      "team",
+      "pr_author",
+      "repo",
+      "actual_behavior",
+      "expected_behavior",
+      "repro_steps",
+      "before_after_proof",
+      "tests_or_smoke",
+      "duplicate_notes",
+      "risk_notes",
+      "review_claim"
+    ],
+    "url": "https://github.com/vibeforge1111/spark-character/pull/286"
+  },
+  "review_claim": {
+    "impact_claim": "medium",
+    "evidence_types": [
+      "redacted_terminal_excerpt",
+      "passing_test"
+    ],
+    "duplicate_notes": "Searched open PRs and issues in vibeforge1111/spark-character for path-leaking error messages. No known duplicate PRs. This fix sanitizes error strings in chip_loader.py and persona.py.",
+    "risk_notes": "Very low risk. The changes are purely to error message strings - no control flow, no logic changes, no new dependencies. The chip ID and artifact filename are still present in the messages for debugging. No tests need modification.",
+    "review_state_requested": "pr_review"
+  }
+}
