@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .persona import ARTIFACTS_DIR, PersonaSpec
 from .provider import ProviderSpec, call_provider, call_provider_async
+from .prompt_guard import sanitize_prompt_text
 
 DEFAULT_CRITIC_VERSION = "v1"
 PASS_TOKEN = "PASS"
@@ -42,7 +43,7 @@ def load_critic(version: str = DEFAULT_CRITIC_VERSION) -> CriticSpec:
     path = ARTIFACTS_DIR / f"critic.{version}.md"
     if not path.exists():
         raise FileNotFoundError(f"Critic artifact not found: {path}")
-    return CriticSpec(version=version, text=path.read_text(encoding="utf-8"))
+    return CriticSpec(version=version, text=sanitize_prompt_text(path.read_text(encoding="utf-8")))
 
 
 def _build_critic_user_prompt(persona: PersonaSpec, draft: str) -> str:
