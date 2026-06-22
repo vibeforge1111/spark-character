@@ -24,7 +24,7 @@ Usage:
     from spark_character.memory_grounded import build_t7_probes_from_state, latest_user_states
     probes = build_t7_probes_from_state(
         sib_home="C:/Users/USER/Desktop/.../tmp-home",
-        human_id="human:telegram:8319079055",
+        human_id="human:telegram:1000000001",
     )
     for p in probes:
         result = run_deep_probe(p, provider=..., persona=...)
