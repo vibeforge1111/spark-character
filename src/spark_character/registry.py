@@ -42,7 +42,7 @@ from typing import Any
 from .chip_loader import PersonalityChip, default_chip_lab_paths, validate_chip_yaml_spec
 
 DEFAULT_LAB_PATH = Path(os.path.expanduser(
-    "~/Desktop/spark-personality-chip-labs/personalities"
+    "~/.spark/spark-personality-chip-labs/personalities"
 ))
 
 
