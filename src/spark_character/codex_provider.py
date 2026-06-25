@@ -22,18 +22,43 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-def _default_codex_binary() -> str:
+def _explicit_codex_path() -> str | None:
+    """Return the operator-supplied codex path (env), expanded, or None.
+
+    Only CODEX_PATH / SPARK_CODEX_PATH are treated as explicit paths; the
+    platform fallbacks ("codex" / "codex.cmd") resolve through PATH and are
+    not validated here.
+    """
     explicit = os.environ.get("CODEX_PATH") or os.environ.get("SPARK_CODEX_PATH")
     if explicit:
-        # Validate the path exists and is a regular file to prevent
-        # arbitrary binary execution via malicious env vars
-        expanded = os.path.expanduser(explicit)
-        if not os.path.isfile(expanded):
-            raise FileNotFoundError(f"Codex binary not found: {expanded}")
-        return expanded
+        return os.path.expanduser(explicit)
+    return None
+
+
+def _default_codex_binary() -> str:
+    # Resolution only — never raises. The isfile validation for an explicit
+    # env-supplied path is deferred to call time (validate_codex_binary), so
+    # that merely importing this module with a stale CODEX_PATH does not crash
+    # eval drivers that don't even use the codex backend.
+    explicit = _explicit_codex_path()
+    if explicit:
+        return explicit
     if sys.platform.startswith("win"):
         return "codex.cmd"
     return "codex"
+
+
+def validate_codex_binary(binary: str) -> None:
+    """Raise FileNotFoundError if an explicitly-configured codex path is bad.
+
+    Guards against arbitrary binary execution via a malicious/stale
+    CODEX_PATH / SPARK_CODEX_PATH env var. Only validates when the resolved
+    binary matches the explicit env path; bare PATH lookups ("codex") are
+    left for subprocess to resolve so this stays a no-op in the common case.
+    """
+    explicit = _explicit_codex_path()
+    if explicit and binary == explicit and not os.path.isfile(binary):
+        raise FileNotFoundError(f"Codex binary not found: {binary}")
 
 
 DEFAULT_CODEX_PATH = _default_codex_binary()
@@ -68,6 +93,9 @@ def call_codex(
     prompt to the user prompt with a clear separator. Functionally
     equivalent for short conversational turns.
     """
+    # Defer the env-path validation to call time so import never crashes on a
+    # stale CODEX_PATH; this still blocks executing an explicit, non-file path.
+    validate_codex_binary(spec.binary)
     combined = f"{system_prompt.strip()}\n\nUser message:\n{user_prompt.strip()}"
     with tempfile.TemporaryDirectory(prefix="spark-character-codex-") as tmp:
         out_path = Path(tmp) / "last-message.txt"
@@ -118,6 +146,7 @@ def call_codex(
 def codex_available(spec: CodexSpec | None = None) -> bool:
     s = spec or CodexSpec()
     try:
+        validate_codex_binary(s.binary)
         result = subprocess.run(
             [s.binary, "--version"], capture_output=True, timeout=5
         )
