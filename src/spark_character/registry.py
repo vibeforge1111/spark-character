@@ -95,8 +95,10 @@ def promote_evolved_persona_to_chip_lab(
         try:
             base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
         except (OSError, ValueError, yaml.YAMLError) as exc:
+            # Keep the basename (not the full path) so the operator knows which
+            # chip file failed without leaking the surrounding directory layout.
             raise ValueError(
-                "Base personality chip YAML is invalid"
+                f"Base personality chip YAML is invalid: {base_yaml_path.name}"
             ) from exc
 
     # Carry everything from the base chip forward, then mark this as an
