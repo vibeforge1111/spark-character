@@ -338,7 +338,7 @@ def load_chip_by_id(
             if chip.id == safe_chip_id:
                 return chip
     raise FileNotFoundError(
-        f"Personality chip '{safe_chip_id}' not found in: {[str(p) for p in paths]}"
+        f"Personality chip '{safe_chip_id}' not found"
     )
 
 
