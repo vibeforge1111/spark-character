@@ -25,7 +25,12 @@ from pathlib import Path
 def _default_codex_binary() -> str:
     explicit = os.environ.get("CODEX_PATH") or os.environ.get("SPARK_CODEX_PATH")
     if explicit:
-        return explicit
+        # Validate the path exists and is a regular file to prevent
+        # arbitrary binary execution via malicious env vars
+        expanded = os.path.expanduser(explicit)
+        if not os.path.isfile(expanded):
+            raise FileNotFoundError(f"Codex binary not found: {expanded}")
+        return expanded
     if sys.platform.startswith("win"):
         return "codex.cmd"
     return "codex"
