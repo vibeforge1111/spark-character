@@ -179,7 +179,11 @@ def main() -> int:
         print(f"=> candidate {args.candidate} WINS")
         return 0
     print(f"=> baseline {args.baseline} holds")
-    return 1
+    # Exit 0 on a completed comparison regardless of verdict (POSIX: the exit
+    # code signals run success/failure, not a domain result). The verdict is on
+    # stdout: "candidate ... WINS" vs "baseline ... holds". No CI/Makefile/
+    # wrapper in this repo branches on the old exit-1 baseline-holds signal.
+    return 0
 
 
 if __name__ == "__main__":
