@@ -152,20 +152,38 @@ def _validate_score(value: Any, field_name: str) -> None:
         raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].")
 
 
+_CHIP_SCHEMA_HINT = (
+    " See docs/ARCHITECTURE.md (schema: spark-personality-chip.v1) for the "
+    "canonical chip YAML overview."
+)
+
+
 def validate_chip_yaml_spec(spec: Any) -> dict[str, Any]:
     """Validate the minimal chip-lab YAML shape consumed by spark-character."""
     root = _require_mapping(spec, "<root>")
     schema = root.get("schema", "spark-personality-chip.v1")
     if not isinstance(schema, str) or not schema.strip():
-        raise ValueError("Personality chip field schema must be a non-empty string.")
+        raise ValueError(
+            "Personality chip field schema must be a non-empty string (e.g. "
+            "'spark-personality-chip.v1')." + _CHIP_SCHEMA_HINT
+        )
 
     identity = _require_mapping(root.get("identity"), "identity")
     for key in ("id", "name"):
         if not isinstance(identity.get(key), str) or not identity.get(key, "").strip():
-            raise ValueError(f"Personality chip field identity.{key} must be a non-empty string.")
+            got = type(identity.get(key)).__name__
+            raise ValueError(
+                f"Personality chip field identity.{key} must be a non-empty string "
+                f"(got {got}). Example: identity:\\n  {key}: \"founder-operator\"."
+                + _CHIP_SCHEMA_HINT
+            )
     for key in ("archetype", "voice_signature", "tagline"):
         if key in identity and identity[key] is not None and not isinstance(identity[key], str):
-            raise ValueError(f"Personality chip field identity.{key} must be a string.")
+            got = type(identity[key]).__name__
+            raise ValueError(
+                f"Personality chip field identity.{key} must be a string "
+                f"(got {got})." + _CHIP_SCHEMA_HINT
+            )
 
     traits = _require_mapping(root.get("traits", {}), "traits")
     for key in TRAIT_FIELDS:
@@ -177,33 +195,64 @@ def validate_chip_yaml_spec(spec: Any) -> dict[str, Any]:
         if key in emotional_profile:
             _validate_score(emotional_profile[key], f"emotional_profile.{key}")
     if "empathy_style" in emotional_profile and not isinstance(emotional_profile["empathy_style"], str):
-        raise ValueError("Personality chip field emotional_profile.empathy_style must be a string.")
+        got = type(emotional_profile["empathy_style"]).__name__
+        raise ValueError(
+            f"Personality chip field emotional_profile.empathy_style must be a string "
+            f"(got {got}). Example: empathy_style: \"warm, but direct when asked\"." + _CHIP_SCHEMA_HINT
+        )
     emotional_range = _require_mapping(emotional_profile.get("emotional_range", {}), "emotional_profile.emotional_range")
     for key, value in emotional_range.items():
         _validate_score(value, f"emotional_profile.emotional_range.{key}")
     triggers = _require_mapping(emotional_profile.get("triggers", {}), "emotional_profile.triggers")
     for key, value in triggers.items():
         if not isinstance(value, list):
-            raise ValueError(f"Personality chip field emotional_profile.triggers.{key} must be a list.")
+            got = type(value).__name__
+            raise ValueError(
+                f"Personality chip field emotional_profile.triggers.{key} must be a list "
+                f"(got {got}). Example: triggers:\\n  {key}: [\"betrayal\", \"unfairness\"]."
+                + _CHIP_SCHEMA_HINT
+            )
 
     preferences = _require_mapping(root.get("preferences", {}), "preferences")
     for key in ("likes", "dislikes"):
         if key in preferences and not isinstance(preferences[key], list):
-            raise ValueError(f"Personality chip field preferences.{key} must be a list.")
+            got = type(preferences[key]).__name__
+            raise ValueError(
+                f"Personality chip field preferences.{key} must be a list "
+                f"(got {got}). Example: preferences:\\n  {key}: [\"short replies\", \"plain language\"]."
+                + _CHIP_SCHEMA_HINT
+            )
     for key in ("communication", "decision_making"):
         if key in preferences and not isinstance(preferences[key], dict):
-            raise ValueError(f"Personality chip field preferences.{key} must be a mapping.")
+            got = type(preferences[key]).__name__
+            raise ValueError(
+                f"Personality chip field preferences.{key} must be a mapping "
+                f"(got {got}). Example: preferences:\\n  {key}:\\n    style: \"direct\"."
+                + _CHIP_SCHEMA_HINT
+            )
 
     safety = _require_mapping(root.get("safety", {}), "safety")
     if "harm_avoidance" in safety and not isinstance(safety["harm_avoidance"], list):
-        raise ValueError("Personality chip field safety.harm_avoidance must be a list.")
+        got = type(safety["harm_avoidance"]).__name__
+        raise ValueError(
+            f"Personality chip field safety.harm_avoidance must be a list "
+            f"(got {got}). Example: harm_avoidance: [\"no medical advice\", \"no legal advice\"]." + _CHIP_SCHEMA_HINT
+        )
 
     for key in TOP_LEVEL_LIST_FIELDS:
         if key in root and not isinstance(root[key], list):
-            raise ValueError(f"Personality chip field {key} must be a list.")
+            got = type(root[key]).__name__
+            raise ValueError(
+                f"Personality chip field {key} must be a list (got {got})."
+                + _CHIP_SCHEMA_HINT
+            )
     for key in TOP_LEVEL_DICT_FIELDS:
         if key in root and not isinstance(root[key], dict):
-            raise ValueError(f"Personality chip field {key} must be a mapping.")
+            got = type(root[key]).__name__
+            raise ValueError(
+                f"Personality chip field {key} must be a mapping (got {got})."
+                + _CHIP_SCHEMA_HINT
+            )
     return root
 
 
@@ -337,8 +386,11 @@ def load_chip_by_id(
                 continue
             if chip.id == safe_chip_id:
                 return chip
+    # Report only the basenames of the labs we actually searched: enough to
+    # debug a misplaced chip without leaking the full filesystem layout.
+    searched = ", ".join(sorted({p.name for p in paths}))
     raise FileNotFoundError(
-        f"Personality chip '{safe_chip_id}' not found"
+        f"Personality chip '{safe_chip_id}' not found in labs: {searched}"
     )
 
 
