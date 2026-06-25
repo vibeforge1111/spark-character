@@ -75,15 +75,35 @@ def call_codex(
             "--output-last-message", str(out_path),
             "-",
         ]
-        result = subprocess.run(
-            cmd,
-            input=combined.encode("utf-8"),
-            capture_output=True,
-            timeout=spec.timeout_seconds,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                input=combined.encode("utf-8"),
+                capture_output=True,
+                timeout=spec.timeout_seconds,
+            )
+        except FileNotFoundError as exc:
+            # Guards the eval/judge driver against a raw stack trace when the
+            # codex CLI is not installed or CODEX_PATH points at a removed
+            # binary. Preserves the operator's next move (install codex or
+            # set CODEX_PATH) instead of leaking the OSError text.
+            raise RuntimeError(
+                f"codex binary not found at {spec.binary!r}. Install the codex CLI "
+                f"or set CODEX_PATH / SPARK_CODEX_PATH to its absolute path."
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            # Closes the silent-hang window when codex exec exceeds the
+            # configured timeout; surfaces the actual budget so the operator
+            # can raise CodexSpec.timeout_seconds rather than guess.
+            raise RuntimeError(
+                f"codex exec timed out after {spec.timeout_seconds:.0f}s. "
+                f"Increase CodexSpec.timeout_seconds or check that the codex "
+                f"CLI is responsive."
+            ) from exc
         if result.returncode != 0:
-            stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
-            raise RuntimeError(f"codex exec failed (rc={result.returncode}): {stderr.strip()[:300]}")
+            # Redact raw stderr (may carry internal paths / prompt fragments);
+            # keep the return code so operators can still triage.
+            raise RuntimeError(f"codex exec failed (rc={result.returncode})")
         if not out_path.exists():
             raise RuntimeError("codex exec did not write the expected output file.")
         text = out_path.read_text(encoding="utf-8", errors="replace").strip()
