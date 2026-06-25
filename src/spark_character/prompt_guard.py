@@ -28,7 +28,7 @@ STORED_PROMPT_INJECTION_PATTERNS = (
         re.compile(PROMPT_BOUNDARY_PREFIX + r"(system|developer)\s+(prompt|message|instruction)s?\b.*\b(override|replace|ignore)\b", re.I),
     ),
     ("hidden-html", re.compile(r"<!--|<\s*(?:div|span)[^>]*(?:display\s*:\s*none|visibility\s*:\s*hidden)", re.I)),
-    ("secret-exfiltration", re.compile(r"\b(curl|wget|fetch)\b.*\b(\.env|secret|token|api[_-]?key|password)\b", re.I)),
+    ("secret-exfiltration", re.compile(r"\b(curl|wget|fetch)\b.*(?<!\w)(\.env|secret|token|api[_-]?key|password)\b", re.I)),
     ("secret-file-request", re.compile(r"\b(read|open|print|cat|get-content)\b.*(\.env|secrets\.local\.json|id_rsa|\.ssh|api[_-]?key)\b", re.I)),
     ("private-key", re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----", re.I)),
 )
