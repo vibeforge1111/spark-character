@@ -302,13 +302,18 @@ def detect_regressions(history: list[dict], current: dict, *, threshold: float =
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fast-interval", type=int, default=1800)
-    parser.add_argument("--full-interval", type=int, default=21600)
+    parser.add_argument("--fast-interval", type=int, default=1800,
+                        help="Seconds between fast-tier cycles (T1 + T2 on the standard prompt set; ~12 LLM calls). Default 1800 = 30 minutes.")
+    parser.add_argument("--full-interval", type=int, default=21600,
+                        help="Seconds between full-tier cycles (T1+T2+T3+T4+T6+T7+T8+T9 via full_pulse; ~50 LLM calls). Default 21600 = 6 hours.")
     parser.add_argument("--once", action="store_true",
                         help="Run one fast + one full and exit. Useful for cron.")
-    parser.add_argument("--regression-threshold", type=float, default=0.10)
-    parser.add_argument("--history-file", default=str(HISTORY_FILE_DEFAULT))
-    parser.add_argument("--heartbeat-file", default=str(HEARTBEAT_FILE_DEFAULT))
+    parser.add_argument("--regression-threshold", type=float, default=0.10,
+                        help="If any tier mean drops more than this fraction below the rolling baseline, a REGRESSION line is logged. Default 0.10 (10%%).")
+    parser.add_argument("--history-file", default=str(HISTORY_FILE_DEFAULT),
+                        help="Where to append the JSONL score history line per run. Default evals/_score_history.jsonl.")
+    parser.add_argument("--heartbeat-file", default=str(HEARTBEAT_FILE_DEFAULT),
+                        help="Where to write the epoch+phase heartbeat each cycle. External monitors can watch the modtime. Default evals/_continuous_eval_heartbeat.txt.")
     parser.add_argument(
         "--providers",
         default="zai",
