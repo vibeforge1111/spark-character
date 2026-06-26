@@ -81,8 +81,11 @@ def strip_markdown_emphasis(text: str) -> str:
     if not text:
         return text
     out = re.sub(r"\*\*\*([^*\n][\s\S]*?[^*\n])\*\*\*", r"\1", text)
+    out = re.sub(r"\*\*\*([^\*\n])\*\*\*", r"\1", out)
     out = re.sub(r"\*\*([^*\n][\s\S]*?[^*\n])\*\*", r"\1", out)
+    out = re.sub(r"\*\*([^\*\n])\*\*", r"\1", out)
     out = re.sub(r"__([^_\n][\s\S]*?[^_\n])__", r"\1", out)
+    out = re.sub(r"__([^\_\n])__", r"\1", out)
     return out
 
 
