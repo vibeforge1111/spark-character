@@ -476,6 +476,8 @@ def render_chip_to_system_prompt(chip: PersonalityChip) -> str:
                 expr = str(s.get("expression") or "").strip()
                 if desc:
                     lines.append(f"- {desc}{(' (' + expr + ')') if expr else ''}")
+            elif isinstance(s, str) and s.strip():
+                lines.append(f"- {s.strip()}")
 
     # Vulnerabilities
     if chip.vulnerabilities:
@@ -490,6 +492,8 @@ def render_chip_to_system_prompt(chip: PersonalityChip) -> str:
                     if mit:
                         line += f" Mitigation: {mit}"
                     lines.append(line)
+            elif isinstance(v, str) and v.strip():
+                lines.append(f"- {v.strip()}")
 
     # Hard universal rules from spark-character
     lines.append("")
