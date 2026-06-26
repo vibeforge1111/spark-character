@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from time import time
@@ -321,8 +322,13 @@ def main() -> int:
             if "score" in r:
                 print(f"  {r['scenario_id']:<32} trait={r['trait']:<40} score={r['score']:.2f}")
 
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text(json.dumps({
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    # Atomic temp+replace so a crash mid-write cannot leave _full_pulse.json
+    # truncated. The full pulse takes minutes against a live provider and is
+    # the canonical T1-T11 evidence operators consult before promoting a
+    # persona; a torn transcript forces re-paying the full LLM cost.
+    payload = json.dumps({
         "persona_version": persona.version,
         "model": provider.model,
         "t1_rows": t1_rows,
@@ -343,7 +349,16 @@ def main() -> int:
         "t8_mean": t8_mean,
         "t9_mean": t9_mean,
         "t11_mean": t11_mean,
-    }, indent=2))
+    }, indent=2)
+    tmp_out = out_path.with_name(f".{out_path.name}.{os.getpid()}.tmp")
+    try:
+        tmp_out.write_text(payload, encoding="utf-8")
+        os.replace(tmp_out, out_path)
+    finally:
+        try:
+            tmp_out.unlink()
+        except FileNotFoundError:
+            pass
     print(f"\nFull transcript: {args.out}")
     base_pass = (
         t1_mean >= 0.95
