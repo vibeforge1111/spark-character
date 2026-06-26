@@ -112,10 +112,21 @@ def _save_seen(path: Path, seen: set[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Cap stored IDs to last 5000 to bound state size
     capped = list(seen)[-5000:]
-    path.write_text(
-        json.dumps({"seen_trace_refs": capped}, indent=2),
-        encoding="utf-8",
-    )
+    # Atomic temp+replace so a crash mid-write cannot truncate the seen-trace
+    # state to empty. A torn state file would force the observer to re-issue
+    # paid meta-LLM calls on every previously-observed trace_ref on restart.
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(
+            json.dumps({"seen_trace_refs": capped}, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _append_observation(path: Path, obs: Observation) -> None:
