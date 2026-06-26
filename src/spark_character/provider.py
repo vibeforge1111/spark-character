@@ -41,6 +41,12 @@ class ProviderSpec:
     api_key: str
     timeout_seconds: float = 60.0
 
+    @staticmethod
+    def _env_or_default(env_name: str, default: str) -> str:
+        """Return the env value when set and non-empty, else fall back to default."""
+        value = (os.environ.get(env_name) or "").strip()
+        return value or default
+
     @classmethod
     def from_env(
         cls,
@@ -51,14 +57,14 @@ class ProviderSpec:
         default_base_url: str = "https://api.z.ai/api/coding/paas/v4/",
         default_model: str = "glm-5.1",
     ) -> "ProviderSpec":
-        api_key = os.environ.get(api_key_env)
+        api_key = (os.environ.get(api_key_env) or "").strip()
         if not api_key:
             raise RuntimeError(
                 f"Missing API key: env var {api_key_env} is not set."
             )
         return cls(
-            base_url=validate_provider_base_url(os.environ.get(base_url_env, default_base_url)),
-            model=os.environ.get(model_env, default_model),
+            base_url=validate_provider_base_url(cls._env_or_default(base_url_env, default_base_url)),
+            model=cls._env_or_default(model_env, default_model),
             api_key=api_key,
         )
 
