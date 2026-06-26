@@ -183,19 +183,35 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
     try:
         return json.loads(raw[open_match.start():])
     except json.JSONDecodeError:
-        depth = 0
-        start = open_match.start()
-        for i in range(start, len(raw)):
-            if raw[i] == "{":
-                depth += 1
-            elif raw[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(raw[start:i + 1])
-                    except json.JSONDecodeError:
-                        return {}
-        return {}
+        pass
+    # Fallback: find balanced braces accounting for string escapes
+    start = open_match.start()
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_string:
+            escape = True
+            continue
+        if ch == '"' and not escape:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(raw[start:i + 1])
+                except json.JSONDecodeError:
+                    return {}
+    return {}
 
 
 def _clamp_dict(
