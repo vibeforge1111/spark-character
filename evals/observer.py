@@ -112,10 +112,12 @@ def _save_seen(path: Path, seen: set[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Cap stored IDs to last 5000 to bound state size
     capped = list(seen)[-5000:]
-    path.write_text(
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(
         json.dumps({"seen_trace_refs": capped}, indent=2),
         encoding="utf-8",
     )
+    os.replace(tmp, path)
 
 
 def _append_observation(path: Path, obs: Observation) -> None:
