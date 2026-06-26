@@ -17,6 +17,13 @@ from dataclasses import dataclass
 
 from .persona import PersonaSpec, load_persona
 from .pipeline import generate
+
+
+# Pre-compiled judge-score patterns. _parse_score runs on every probe judge
+# response in every character evaluation pass, so per-call recompilation
+# adds up across multi-trait evaluation runs.
+_SCORE_LINE_RE = re.compile(r"SCORE\s*=\s*(\d+)", re.IGNORECASE)
+_SCORE_DIGIT_RE = re.compile(r"\b([0-9]|10)\b")
 from .provider import ProviderSpec, call_provider
 
 
@@ -225,10 +232,10 @@ def run_probe(
 def _parse_score(text: str) -> int:
     if not text:
         return 5
-    match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
+    match = _SCORE_LINE_RE.search(text)
     if match:
         return max(0, min(10, int(match.group(1))))
-    digits = re.findall(r"\b([0-9]|10)\b", text)
+    digits = _SCORE_DIGIT_RE.findall(text)
     if digits:
         return max(0, min(10, int(digits[0])))
     return 5
