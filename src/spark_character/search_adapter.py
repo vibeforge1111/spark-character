@@ -224,6 +224,11 @@ _SNIPPET_RE = re.compile(
     r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>',
     re.IGNORECASE | re.DOTALL,
 )
+# Tag-stripper for cleaning HTML out of title/snippet matches. _strip_tags is
+# called twice per parsed result (title + snippet) so up to 20 invocations per
+# DuckDuckGo response; compile-once at module load matches the convention
+# already followed by _RESULT_BLOCK_RE / _SNIPPET_RE in this file.
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def _parse_duckduckgo_html(text: str) -> list[SearchResult]:
@@ -261,4 +266,4 @@ def _decode_duckduckgo_redirect(raw_url: str) -> str:
 
 
 def _strip_tags(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text)
+    return _HTML_TAG_RE.sub("", text)
