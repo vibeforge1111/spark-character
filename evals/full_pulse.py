@@ -87,7 +87,12 @@ def main() -> int:
             print(f"[{label}] ERROR generating: {exc}")
             t1_rows.append({"label": label, "prompt": prompt, "error": str(exc)})
             continue
-        t1 = score_persona(result.final)
+        try:
+            t1 = score_persona(result.final)
+        except Exception as exc:
+            print(f"[{label}] T1 scorer error: {exc}")
+            t1_rows.append({"label": label, "prompt": prompt, "error": str(exc)})
+            continue
         try:
             t2 = score_distinctiveness(result.final, provider=provider)
         except Exception as exc:

@@ -23,8 +23,8 @@ Usage:
 
     from spark_character.memory_grounded import build_t7_probes_from_state, latest_user_states
     probes = build_t7_probes_from_state(
-        sib_home="C:/Users/USER/Desktop/.../tmp-home",
-        human_id="human:telegram:8319079055",
+        sib_home=Path.home() / ".spark" / "sib-home",
+        human_id="human:telegram:<your-user-id>",
     )
     for p in probes:
         result = run_deep_probe(p, provider=..., persona=...)
@@ -68,8 +68,10 @@ class UserStateObservation:
 def _open_state(sib_home: str | Path) -> sqlite3.Connection:
     db = Path(sib_home) / "state.db"
     if not db.exists():
-        raise FileNotFoundError(f"state.db not found in {sib_home}")
-    return sqlite3.connect(str(db))
+        raise FileNotFoundError("State database not found")
+    # Open read-only via URI so the probe builder can never accidentally
+    # mutate SIB's authoritative state.db (user_instructions, personality_observations).
+    return sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 
 
 def latest_user_instructions(

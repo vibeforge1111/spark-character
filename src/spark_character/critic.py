@@ -41,7 +41,7 @@ class CritiqueResult:
 def load_critic(version: str = DEFAULT_CRITIC_VERSION) -> CriticSpec:
     path = ARTIFACTS_DIR / f"critic.{version}.md"
     if not path.exists():
-        raise FileNotFoundError(f"Critic artifact not found: {path}")
+        raise FileNotFoundError("Critic artifact not found")
     return CriticSpec(version=version, text=path.read_text(encoding="utf-8"))
 
 

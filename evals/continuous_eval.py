@@ -42,9 +42,11 @@ import argparse
 import json
 import sys
 import time
-import traceback
+import logging
 from pathlib import Path
 from statistics import mean as mean_
+
+_logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
@@ -385,7 +387,7 @@ def main() -> int:
                     last_full = now
             except Exception as exc:
                 print(f"[continuous_eval] eval error on {provider_name}: {exc}", flush=True)
-                traceback.print_exc()
+                _logger.exception("eval error on %s", provider_name)
                 _write_heartbeat(heartbeat_path, "error")
                 if args.once:
                     return 1
@@ -442,7 +444,7 @@ def main() -> int:
             return 0
         except Exception as exc:
             print(f"[continuous_eval] outer error: {exc}", flush=True)
-            traceback.print_exc()
+            _logger.exception("outer eval loop error")
             time.sleep(60)
 
 
