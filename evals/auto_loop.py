@@ -75,9 +75,23 @@ def _load_state(path: Path) -> dict:
         }
 
 
-def _save_state(path: Path, state: dict) -> None:
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    """Write JSON to path atomically: temp file in same dir, then os.replace."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+    try:
+        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        os.replace(str(tmp), str(path))
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
+
+def _save_state(path: Path, state: dict) -> None:
+    _atomic_write_json(path, state)
 
 
 def _write_heartbeat(path: Path, phase: str) -> None:
