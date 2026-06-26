@@ -150,7 +150,22 @@ def main() -> int:
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({"rows": rows, "means": means, "overall": overall_mean}, indent=2))
+    # Atomic temp+replace so a crash mid-write cannot leave _pulse_last.json
+    # truncated. CI-style consumers gate on the exit code, but humans and
+    # downstream tooling read the transcript file for diffs and regression
+    # triage; a half-written file fails json.loads silently in those readers.
+    tmp_out = out_path.with_name(f".{out_path.name}.{os.getpid()}.tmp")
+    try:
+        tmp_out.write_text(
+            json.dumps({"rows": rows, "means": means, "overall": overall_mean}, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(tmp_out, out_path)
+    finally:
+        try:
+            tmp_out.unlink()
+        except FileNotFoundError:
+            pass
     print(f"\nFull transcript: {out_path}")
 
     return 0 if overall_mean >= 0.9 else 1
