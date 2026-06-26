@@ -294,11 +294,11 @@ def main() -> int:
     print(f"T3 behavioral mean:      {t3_mean}")
     print(f"T4 stability mean:       {t4_mean}")
     print(f"T6 emotional mean:       {t6_mean}")
-    print(f"T7 memory coherence mean:{t7_mean}")
+    print(f"T7 memory coherence mean: {t7_mean}")
     print(f"T8 initiative mean:      {t8_mean}")
     print(f"T9 aesthetic mean:       {t9_mean}")
     if t11_mean is not None:
-        print(f"T11 sustained-attack mean:{t11_mean}")
+        print(f"T11 sustained-attack mean:  {t11_mean}")
     print()
     print("T3 per-trait:")
     for r in t3_rows:
