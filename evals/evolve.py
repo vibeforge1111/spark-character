@@ -163,6 +163,7 @@ def main() -> int:
     print()
 
     candidates = []
+    candidate_errors: list[dict] = []
     for i in range(args.candidates):
         print(f"[candidate {i + 1}] mutating + scoring...")
         t0 = time.time()
@@ -173,6 +174,9 @@ def main() -> int:
             candidates.append({"index": i + 1, "text": text, "overall": overall, "rows": rows})
             print(f"[candidate {i + 1}] overall={overall} in {time.time() - t0:.1f}s\n")
         except Exception as exc:
+            candidate_errors.append(
+                {"index": i + 1, "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+            )
             print(f"[candidate {i + 1}] ERROR: {exc}\n")
 
     candidates.sort(key=lambda c: c["overall"], reverse=True)
@@ -203,6 +207,9 @@ def main() -> int:
             "baseline_version": n,
             "baseline_overall": baseline_overall,
             "candidates": [{"index": c["index"], "overall": c["overall"]} for c in candidates],
+            "candidate_attempts": args.candidates,
+            "candidate_error_count": len(candidate_errors),
+            "candidate_errors": candidate_errors,
             "winner_text": winner["text"] if winner else None,
             "promoted": bool(promote and not args.dry_run),
         }, indent=2)
