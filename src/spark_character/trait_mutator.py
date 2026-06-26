@@ -183,19 +183,13 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
     try:
         return json.loads(raw[open_match.start():])
     except json.JSONDecodeError:
-        depth = 0
+        decoder = json.JSONDecoder()
         start = open_match.start()
-        for i in range(start, len(raw)):
-            if raw[i] == "{":
-                depth += 1
-            elif raw[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(raw[start:i + 1])
-                    except json.JSONDecodeError:
-                        return {}
-        return {}
+        try:
+            obj, _ = decoder.raw_decode(raw, start)
+            return obj
+        except (json.JSONDecodeError, ValueError):
+            return {}
 
 
 def _clamp_dict(
