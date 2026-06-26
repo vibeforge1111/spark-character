@@ -114,7 +114,7 @@ def set_latest_persona_version(
         os.replace(temp_path, pointer_path)
     finally:
         temp_path.unlink(missing_ok=True)
-    protect_latest_pointer(pointer_path)
+        protect_latest_pointer(pointer_path)
 
     record = {
         "changed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
