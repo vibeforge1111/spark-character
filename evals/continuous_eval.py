@@ -412,8 +412,18 @@ def main() -> int:
                         "llm_rows": findings.llm_rows,
                         "failures_by_kind": dict(findings.failures_by_kind),
                     }
-                except Exception:
-                    pass
+                except Exception as audit_exc:
+                    # Surface the reason so a missing production_audit field in a
+                    # subset of rows is not silently indistinguishable from
+                    # "audit miner found nothing"; the eval loop continues.
+                    row["production_audit_error"] = (
+                        f"{type(audit_exc).__name__}: {str(audit_exc)[:200]}"
+                    )
+                    print(
+                        f"[continuous_eval] production_audit miner failed on {provider_name}: "
+                        f"{type(audit_exc).__name__}: {audit_exc}",
+                        flush=True,
+                    )
             history = _load_history(history_path)
             # Per-provider baseline so regressions reflect drift on the
             # same backend, not noise from cross-provider differences
