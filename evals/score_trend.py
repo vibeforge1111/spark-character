@@ -148,7 +148,8 @@ def main() -> int:
 
     regressions = [r for r in rows if r.get("regressions")]
     if regressions:
-        print(f"\n=== {len(regressions)} regression event(s) in window ===")
+        noun = "event" if len(regressions) == 1 else "events"
+        print(f"\n=== {len(regressions)} regression {noun} in window ===")
         for r in regressions[-5:]:
             ts = r.get("ts")
             when = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(ts))) if ts else "?"
