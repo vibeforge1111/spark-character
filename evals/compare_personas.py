@@ -115,6 +115,14 @@ def score(version: str, provider: ProviderSpec, *, max_tokens: int) -> dict:
         "t7": round(mean_(t7_scores), 3) if t7_scores else 0.0,
         "t8": round(mean_(t8_scores), 3) if t8_scores else 0.0,
         "t8_per_probe": t8_per_probe,
+        "score_counts": {
+            "t1": len(t1_scores),
+            "t2": len(t2_scores),
+            "t3": len(t3_scores),
+            "t6": len(t6_scores),
+            "t7": len(t7_scores),
+            "t8": len(t8_scores),
+        },
     }
 
 
@@ -164,6 +172,16 @@ def main() -> int:
     base_c = composite(base, weights)
     cand_c = composite(cand, weights)
     delta = round(cand_c - base_c, 4)
+
+    def _empty_tiers(row: dict) -> list[str]:
+        return [tier for tier, count in row["score_counts"].items() if count == 0]
+
+    base_empty = _empty_tiers(base)
+    cand_empty = _empty_tiers(cand)
+    if base_empty:
+        print(f"NOTE: baseline {args.baseline} had ZERO scores recorded for tiers: {','.join(base_empty)}; their reported value of 0.0 is a missing-scores sentinel, not a real score.")
+    if cand_empty:
+        print(f"NOTE: candidate {args.candidate} had ZERO scores recorded for tiers: {','.join(cand_empty)}; their reported value of 0.0 is a missing-scores sentinel, not a real score.")
 
     print("\n=== verdict ===")
     print(f"[{args.baseline}] T1={base['t1']} T2={base['t2']} T3={base['t3']} T6={base['t6']} T7={base['t7']} T8={base['t8']} composite={base_c}")
