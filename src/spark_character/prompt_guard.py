@@ -17,11 +17,11 @@ INVISIBLE_UNICODE_CHARS = {
     "\u202d": "LEFT-TO-RIGHT OVERRIDE",
     "\u202e": "RIGHT-TO-LEFT OVERRIDE",
 }
-PROMPT_BOUNDARY_PREFIX = r"(?:^|[:\-]\s*)"
+PROMPT_BOUNDARY_PREFIX = r"(?:^|[:\-;,.\s]\s*)"
 STORED_PROMPT_INJECTION_PATTERNS = (
     (
         "instruction-override",
-        re.compile(PROMPT_BOUNDARY_PREFIX + r"(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+instructions\b", re.I),
+        re.compile(PROMPT_BOUNDARY_PREFIX + r"(ignore|disregard|forget|discard|supersede|negate|void|cancel|nullify|revoke|abandon)\s+(all\s+)?(previous|prior|above|earlier|preceding)\s+instructions?\b", re.I),
     ),
     (
         "system-prompt-override",
