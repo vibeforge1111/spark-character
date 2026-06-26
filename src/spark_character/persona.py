@@ -177,7 +177,7 @@ def load_persona(
     Both axes compose orthogonally. The full chain reaches the model
     in a single system prompt.
     """
-    resolved = version or resolve_latest_persona_version()
+    resolved = validate_persona_version(version) if version else resolve_latest_persona_version()
     path = ARTIFACTS_DIR / f"persona.{resolved}.md"
     if not path.exists():
         raise FileNotFoundError(f"Persona artifact not found: persona.{resolved}.md")
