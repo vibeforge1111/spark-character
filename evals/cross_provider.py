@@ -112,8 +112,15 @@ def resolve_providers(names: list[str]) -> list[ProviderProfile]:
         elif n == "codex":
             spec = CodexSpec()
             if not codex_available(spec):
+                print(f"[cross_provider] skipping 'codex' (binary not on PATH)", file=sys.stderr)
                 continue
             out.append(ProviderProfile(name="codex", spec=spec, kind="codex"))
+        else:
+            print(
+                f"[cross_provider] unknown provider '{name}'; "
+                f"known: zai, openai, minimax, codex",
+                file=sys.stderr,
+            )
     return out
 
 
