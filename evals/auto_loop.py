@@ -130,11 +130,17 @@ def maybe_refresh_consumers(args) -> None:
     for py in pythons:
         try:
             print(f"[auto_loop] refreshing consumer: {py}", flush=True)
-            subprocess.run(
+            result = subprocess.run(
                 [py, "-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-deps", pkg_url, "-q"],
                 check=False,
                 timeout=180,
             )
+            if result.returncode != 0:
+                print(
+                    f"[auto_loop] consumer refresh non-zero for {py} "
+                    f"(exit {result.returncode}); package may still be at the previous version.",
+                    flush=True,
+                )
         except Exception as exc:
             print(f"[auto_loop] consumer refresh failed for {py}: {exc}")
 
