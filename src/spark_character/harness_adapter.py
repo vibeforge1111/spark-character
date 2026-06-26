@@ -48,10 +48,18 @@ def build_run_fn(
     max_tokens: int = 600,
     temperature: float = 0.7,
 ) -> RunFn:
-    p = persona or load_persona(provider_kind=detect_provider_kind(provider))
-    c = critic if (critic is not None or not use_critic) else load_critic()
+    persona_fallback = persona
+    critic_fallback = critic
+    provider_kind = detect_provider_kind(provider)
 
     async def _run(prompt: str) -> HarnessResult:
+        # Reload persona (and critic) on every call so evolution promotions
+        # picked up between invocations take effect immediately instead of
+        # requiring the harness adapter to be rebuilt.
+        p = load_persona(provider_kind=provider_kind) if persona_fallback is None else persona_fallback
+        c = (
+            load_critic() if (use_critic and critic_fallback is None) else critic_fallback
+        )
         if use_critic and c is not None:
             result = await generate_with_critique_async(
                 prompt,
