@@ -339,9 +339,22 @@ def main() -> int:
     provider_names = [p.strip() for p in args.providers.split(",") if p.strip()]
     providers: list[tuple[str, ProviderSpec]] = []
     for name in provider_names:
+        cfg = PROVIDER_DEFAULTS.get(name.lower().strip())
+        if cfg is None:
+            known = ", ".join(sorted(PROVIDER_DEFAULTS))
+            print(
+                f"[continuous_eval] skipping {name!r}: unknown provider name "
+                f"(known providers: {known})",
+                flush=True,
+            )
+            continue
         spec = resolve_provider(name)
         if spec is None:
-            print(f"[continuous_eval] skipping {name!r}: API key not set in env", flush=True)
+            api_key_env = cfg["api_key_env"]
+            print(
+                f"[continuous_eval] skipping {name!r}: {api_key_env} is not set in env",
+                flush=True,
+            )
             continue
         providers.append((name, spec))
     if not providers:
