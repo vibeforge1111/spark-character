@@ -54,6 +54,19 @@ PROMPTS = [
 
 def _load(version: str) -> PersonaSpec:
     path = ARTIFACTS_DIR / f"persona.{version}.md"
+    if not path.exists():
+        available = sorted(
+            p.name[len("persona."):-len(".md")]
+            for p in ARTIFACTS_DIR.glob("persona.v*.md")
+        )
+        hint = (
+            f"; available versions: {', '.join(available)}"
+            if available
+            else " (no persona.v*.md artifacts found)"
+        )
+        raise SystemExit(
+            f"compare_personas: persona '{version}' not found at {path}{hint}"
+        )
     text = path.read_text(encoding="utf-8")
     return PersonaSpec(version=version, text=text)
 
