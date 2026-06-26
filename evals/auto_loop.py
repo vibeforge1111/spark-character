@@ -203,7 +203,9 @@ def main() -> int:
                 f"threshold={args.new_replies_threshold}",
                 flush=True,
             )
-            should_fire = new_replies >= args.new_replies_threshold or state.get("last_audit_count", 0) == 0
+            should_fire = new_replies >= args.new_replies_threshold or (
+                state.get("last_audit_count", 0) == 0 and state.get("cycle_count", 0) == 0
+            )
             if should_fire:
                 state["last_cycle_phase"] = "evolving"
                 state["last_cycle_started_at"] = int(time.time())
