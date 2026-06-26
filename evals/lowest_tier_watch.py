@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -45,6 +46,8 @@ HISTORY_FILE_DEFAULT = Path("evals/_score_history.jsonl")
 STATE_FILE_DEFAULT = Path("evals/_lowest_tier_watch_state.json")
 HEARTBEAT_FILE_DEFAULT = Path("evals/_lowest_tier_watch_heartbeat.txt")
 EVOLUTION_SUBPROCESS_TIMEOUT_SECONDS = 2400
+
+logger = logging.getLogger(__name__)
 
 TIER_KEYS = (
     "t1_mean", "t2_mean", "t3_mean", "t4_mean",
@@ -106,7 +109,17 @@ def _write_heartbeat(path: Path, phase: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{int(time.time())} {phase}\n", encoding="utf-8")
     except Exception:
-        pass
+        # The watcher is a long-running loop; a stale heartbeat file is the
+        # only externally-visible signal that the trigger cycle is alive.
+        # Silently swallowing the write failure means liveness checks turn
+        # red with no breadcrumb in the operator log. Name the path + phase
+        # so the cause (perms, disk full, parent-dir gone) is debuggable.
+        logger.warning(
+            "lowest_tier_watch heartbeat write failed at %s (phase=%s); liveness checks will go stale",
+            path,
+            phase,
+            exc_info=True,
+        )
 
 
 def find_lowest_tier(history: list[dict], *, min_runs: int) -> tuple[str | None, float, int]:
