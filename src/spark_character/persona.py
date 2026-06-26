@@ -34,13 +34,24 @@ class PersonaSpec:
         return self.text.strip()
 
 
+def _validate_overlay_name(name: str, label: str) -> str:
+    """Reject overlay names that contain path separators or traversal
+    sequences.  Only bare file-stem values like ``zai`` or ``voice``
+    are accepted; anything else is rejected early."""
+    safe = name.lower().strip()
+    if "/" in safe or "\\" in safe or ".." in safe:
+        raise ValueError(f"Invalid {label}: {name!r}")
+    return safe
+
+
 def load_overlay(provider_kind: str | None) -> str:
     """Return the overlay markdown for a given backend kind, or '' if
     none is configured. Provider kinds: 'zai', 'minimax', 'codex',
     'openai', 'ollama'. Unknown kinds return ''."""
     if not provider_kind:
         return ""
-    path = OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md"
+    safe = _validate_overlay_name(provider_kind, "provider_kind")
+    path = OVERLAYS_DIR / f"{safe}.md"
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
@@ -52,7 +63,8 @@ def load_surface_overlay(surface: str | None) -> str:
     'tui', 'cli'. Unknown surfaces return ''."""
     if not surface:
         return ""
-    path = OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md"
+    safe = _validate_overlay_name(surface, "surface")
+    path = OVERLAYS_DIR / "surface" / f"{safe}.md"
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
