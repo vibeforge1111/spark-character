@@ -94,7 +94,10 @@ def _summarize(rows: list[dict], *, compare_back: int) -> dict:
             continue
         latest = values[-1]
         window_mean = round(mean_(values), 3)
-        compared = values[-compare_back] if len(values) > compare_back else (values[0] if values else None)
+        # values[-1] is the current run, so the prior run is values[-2] and
+        # "compare_back N" means N runs before current -> values[-(N+1)].
+        baseline_index = compare_back + 1
+        compared = values[-baseline_index] if len(values) >= baseline_index else (values[0] if values else None)
         delta = round(latest - compared, 3) if compared is not None else None
         summary[k] = {
             "latest": latest,
