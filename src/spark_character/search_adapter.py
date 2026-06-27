@@ -158,7 +158,7 @@ def attach_search_context(
         if snippet:
             context_lines.append(f"   {snippet}")
         if r.url:
-            context_lines.append(f"   source: {r.url}")
+            context_lines.append(f"   source: {_safe_search_context_text(r.url)}")
     context_lines.append("</live_search_results>")
     context_lines.append("")
     context_lines.append("[User message]")
