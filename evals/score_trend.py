@@ -65,7 +65,7 @@ def _format_table(rows: list[dict]) -> str:
     if not rows:
         return "no rows yet"
     header_keys = ["ts", "persona", "tier"] + list(TIER_KEYS)
-    header = "{:<19} {:<22} {:<6} ".format("when", "persona", "tier") + " ".join(
+    header = "{:<23} {:<22} {:<6} ".format("when (UTC)", "persona", "tier") + " ".join(
         f"{k.replace('_mean','').upper():>5}" for k in TIER_KEYS
     )
     lines = [header]
@@ -73,7 +73,7 @@ def _format_table(rows: list[dict]) -> str:
     for r in rows:
         ts = r.get("ts")
         when = (
-            time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(ts))) if ts else "?"
+            time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(int(ts))) if ts else "?"
         )
         persona = (r.get("persona_version") or "")[:22]
         tier = (r.get("tier") or "")[:6]
@@ -81,7 +81,7 @@ def _format_table(rows: list[dict]) -> str:
         for k in TIER_KEYS:
             v = r.get(k)
             cells.append(f"{v:>5}" if isinstance(v, (int, float)) else f"{'-':>5}")
-        lines.append("{:<19} {:<22} {:<6} ".format(when, persona, tier) + " ".join(cells))
+        lines.append("{:<23} {:<22} {:<6} ".format(when, persona, tier) + " ".join(cells))
     return "\n".join(lines)
 
 
@@ -151,7 +151,7 @@ def main() -> int:
         print(f"\n=== {len(regressions)} regression event(s) in window ===")
         for r in regressions[-5:]:
             ts = r.get("ts")
-            when = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(ts))) if ts else "?"
+            when = time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(int(ts))) if ts else "?"
             print(f"\n[{when}] {r.get('persona_version')}/{r.get('tier')}")
             for line in r["regressions"]:
                 print(f"  {line}")
