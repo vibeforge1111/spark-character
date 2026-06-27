@@ -198,8 +198,13 @@ def load_persona(
 
 
 def load_persona_from_path(path: str | Path) -> PersonaSpec:
-    p = Path(path)
+    p = Path(path).resolve()
     if not p.exists():
         raise FileNotFoundError(f"Persona artifact not found: {p.name}")
+    if not p.is_file():
+        raise ValueError(f"Persona path is not a file: {p}")
+    # Reject paths with traversal components that weren't resolved away
+    if ".." in str(path):
+        raise ValueError(f"Persona path contains traversal: {path!r}")
     version = p.stem.split(".", 1)[-1] if "." in p.stem else "custom"
     return PersonaSpec(version=version, text=sanitize_prompt_text(p.read_text(encoding="utf-8")))
