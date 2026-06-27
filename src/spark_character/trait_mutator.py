@@ -24,10 +24,13 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import math
 import re
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Optional
+
+log = logging.getLogger(__name__)
 
 from .chip_loader import PersonalityChip
 from .provider import ProviderSpec, call_provider
@@ -99,6 +102,7 @@ class TraitMutationResult:
     emotional_range_deltas: dict[str, float]
     reasoning: str
     raw_response: str
+    parse_failed: bool = False
 
 
 def mutate_trait_values(
@@ -125,6 +129,17 @@ def mutate_trait_values(
         disable_thinking=True,
     )
     parsed = _parse_trait_response(raw)
+    if parsed is None:
+        log.warning("Failed to parse trait mutator response; returning chip unchanged")
+        return TraitMutationResult(
+            chip=chip,
+            deltas={},
+            emotional_profile_deltas={},
+            emotional_range_deltas={},
+            reasoning="",
+            raw_response=raw,
+            parse_failed=True,
+        )
     deltas = _clamp_dict(parsed.get("deltas", {}), TRAIT_FIELDS, max_delta)
     profile_deltas = _clamp_dict(
         parsed.get("emotional_profile_deltas", {}),
@@ -168,10 +183,16 @@ def _build_user_prompt(chip: PersonalityChip, weaknesses: list[str]) -> str:
     )
 
 
-def _parse_trait_response(text: str) -> dict[str, Any]:
-    """Extract the JSON object from the mutator response."""
+def _parse_trait_response(text: str) -> Optional[dict[str, Any]]:
+    """Extract the JSON object from the mutator response.
+
+    Returns the parsed dict on success, or None when the response is
+    empty, contains no JSON object, or has malformed / incomplete JSON.
+    Callers must distinguish None (parse failure) from {} (valid response
+    with no deltas, meaning the LLM judged no changes are needed).
+    """
     if not text:
-        return {}
+        return None
     raw = text.strip()
     if raw.startswith("```"):
         match = re.search(r"```(?:json)?\s*\n(.*?)```", raw, re.DOTALL)
@@ -179,7 +200,7 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
             raw = match.group(1).strip()
     open_match = re.search(r"\{", raw)
     if not open_match:
-        return {}
+        return None
     try:
         return json.loads(raw[open_match.start():])
     except json.JSONDecodeError:
@@ -194,8 +215,8 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
                     try:
                         return json.loads(raw[start:i + 1])
                     except json.JSONDecodeError:
-                        return {}
-        return {}
+                        return None
+        return None
 
 
 def _clamp_dict(

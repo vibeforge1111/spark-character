@@ -115,9 +115,9 @@ def test_parse_trait_response_handles_preamble() -> None:
     assert parsed["deltas"] == {"openness": 0.03}
 
 
-def test_parse_trait_response_returns_empty_on_garbage() -> None:
-    assert _parse_trait_response("") == {}
-    assert _parse_trait_response("not json at all") == {}
+def test_parse_trait_response_returns_none_on_garbage() -> None:
+    assert _parse_trait_response("") is None
+    assert _parse_trait_response("not json at all") is None
 
 
 def test_chip_to_yaml_dict_round_trip_preserves_structure(
