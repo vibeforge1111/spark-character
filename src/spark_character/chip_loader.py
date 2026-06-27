@@ -335,7 +335,15 @@ def load_chip(path: str | Path) -> PersonalityChip:
     Uses spark-personality-chip-labs's loader if available (gets
     schema validation), otherwise falls back to a local PyYAML read.
     """
-    p = Path(path)
+    p = Path(path).resolve()  # PATH-TRAVERSAL-PATCH
+    _ALLOWED_DIRS = [
+        Path.home() / "Desktop" / "spark-personality-chip-labs" / "personalities",
+        Path(".") / "personalities",
+        Path.home() / ".spark" / "personalities",
+    ]
+    _resolved_allowed = [d.resolve() for d in _ALLOWED_DIRS]
+    if not any(str(p).startswith(str(a)) for a in _resolved_allowed):
+        raise ValueError(f"Personality chip path outside allowed directories: {p}")
     if not p.exists():
         raise FileNotFoundError(f"Personality chip not found: {p}")
     if _LAB_AVAILABLE and _lab_load_personality is not None:
