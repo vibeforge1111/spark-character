@@ -209,8 +209,20 @@ def _duckduckgo_html_search(query: str) -> list[SearchResult]:
             "Chrome/120.0 Safari/537.36"
         ),
     }
-    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+    with httpx.Client(timeout=8.0, follow_redirects=False) as client:
         resp = client.get(url, params={"q": query}, headers=headers)
+        # Follow redirects manually, staying on the same domain
+        for _ in range(3):
+            if resp.status_code not in (301, 302, 303, 307, 308):
+                break
+            location = resp.headers.get("location", "")
+            if not location:
+                break
+            from urllib.parse import urlparse
+            loc_parsed = urlparse(location)
+            if loc_parsed.hostname and loc_parsed.hostname != urlparse(url).hostname:
+                break
+            resp = client.get(location, headers=headers)
         resp.raise_for_status()
         html_text = resp.text
     return _parse_duckduckgo_html(html_text)
