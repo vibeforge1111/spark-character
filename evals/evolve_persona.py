@@ -239,7 +239,9 @@ def composite(scores: dict, weights: tuple[float, ...]) -> float:
     (T1, T2, T3) or (T1, T2, T3, T6, T7, T8)."""
     w = list(weights) + [0.0] * 6
     keys = ("t1_mean", "t2_mean", "t3_mean", "t6_mean", "t7_mean", "t8_mean")
-    return round(sum(w[i] * scores.get(keys[i], 0.0) for i in range(6)), 3)
+    # Only sum weights for tiers that have actual scores (not default 0.0)
+    active = min(len(weights), 3) if scores.get("t6_mean") is None else min(len(weights), 6)
+    return round(sum(w[i] * scores.get(keys[i], 0.0) for i in range(active)), 3)
 
 
 def diagnose(scores: dict) -> list[str]:

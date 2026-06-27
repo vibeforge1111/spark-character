@@ -140,7 +140,7 @@ def _first_sentence(text: str) -> str:
     stripped = text.strip()
     if not stripped:
         return ""
-    parts = re.split(r"(?<=[.!?])\s+", stripped, maxsplit=1)
+    parts = re.split(r"(?<=[.!?])\s+(?=[A-Z])", stripped, maxsplit=1)
     return parts[0] if parts else stripped
 
 
