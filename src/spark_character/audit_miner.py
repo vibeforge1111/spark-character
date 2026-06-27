@@ -131,7 +131,10 @@ class AuditMiner:
             if not raw:
                 continue
             try:
-                row = json.loads(raw)
+                try:
+                    row = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    raise ValueError("Invalid JSON (audit_miner.py)") from exc
             except json.JSONDecodeError:
                 continue
             if only_user and str(row.get("telegram_user_id") or "") != only_user:
