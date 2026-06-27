@@ -98,7 +98,7 @@ def promote_evolved_persona_to_chip_lab(
             # Keep the basename (not the full path) so the operator knows which
             # chip file failed without leaking the surrounding directory layout.
             raise ValueError(
-                f"Base personality chip YAML is invalid: {base_yaml_path.name}"
+                "Base personality chip YAML is invalid"
             ) from exc
 
     # Carry everything from the base chip forward, then mark this as an
