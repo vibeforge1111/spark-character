@@ -344,7 +344,7 @@ def load_chip(path: str | Path) -> PersonalityChip:
             raise ValueError(f"Personality chip lab failed to parse {p}")
         return _coerce_lab_chip(lab_chip)
     import yaml  # type: ignore
-    with p.open("r", encoding="utf-8") as f:
+    with p.open("r", encoding="utf-8-sig") as f:
         spec = yaml.safe_load(f) or {}
     return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
 
