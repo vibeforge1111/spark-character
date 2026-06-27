@@ -158,11 +158,25 @@ def parse_observation_response(text: str) -> dict:
         return json.loads(raw[open_match.start():])
     except json.JSONDecodeError:
         depth = 0
+        in_string = False
+        escape = False
         start = open_match.start()
         for i in range(start, len(raw)):
-            if raw[i] == "{":
+            c = raw[i]
+            if escape:
+                escape = False
+                continue
+            if c == "\\":
+                escape = True
+                continue
+            if c == """:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if c == "{":
                 depth += 1
-            elif raw[i] == "}":
+            elif c == "}":
                 depth -= 1
                 if depth == 0:
                     try:
