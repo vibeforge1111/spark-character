@@ -80,9 +80,9 @@ def strip_markdown_emphasis(text: str) -> str:
     """Remove paired bold/italic emphasis markers while preserving bullets."""
     if not text:
         return text
-    out = re.sub(r"\*\*\*([^*\n][\s\S]*?[^*\n])\*\*\*", r"\1", text)
-    out = re.sub(r"\*\*([^*\n][\s\S]*?[^*\n])\*\*", r"\1", out)
-    out = re.sub(r"__([^_\n][\s\S]*?[^_\n])__", r"\1", out)
+    out = re.sub(r"\*\*\*([^*\n][\s\S]{0,10000}?[^*\n])\*\*\*", r"\1", text)
+    out = re.sub(r"\*\*([^*\n][\s\S]{0,10000}?[^*\n])\*\*", r"\1", out)
+    out = re.sub(r"__([^_\n][\s\S]{0,10000}?[^_\n])__", r"\1", out)
     return out
 
 
