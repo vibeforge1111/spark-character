@@ -36,6 +36,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,10 +113,27 @@ def _save_seen(path: Path, seen: set[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Cap stored IDs to last 5000 to bound state size
     capped = list(seen)[-5000:]
-    path.write_text(
-        json.dumps({"seen_trace_refs": capped}, indent=2),
-        encoding="utf-8",
-    )
+    payload = json.dumps({"seen_trace_refs": capped}, indent=2)
+    # Atomic write: write to a temp file in the same directory, then
+    # os.replace() into place.  A crash mid-write leaves the temp file
+    # orphaned but never corrupts the real file.
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    try:
+        os.write(fd, payload.encode("utf-8"))
+        os.close(fd)
+        fd = -1
+        os.replace(tmp, path)
+    except Exception:
+        if fd >= 0:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _append_observation(path: Path, obs: Observation) -> None:
