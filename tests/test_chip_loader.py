@@ -256,3 +256,44 @@ def test_load_chip_by_id_does_not_swallow_unexpected_loader_errors(
 
     with pytest.raises(RuntimeError, match="unexpected loader bug"):
         chip_loader.load_chip_by_id("founder-operator", search_paths=[tmp_path])
+
+
+# --- Path-traversal guard tests ---------------------------------------------
+
+
+def test_safe_chip_id_rejects_forward_slash() -> None:
+    with pytest.raises(ValueError, match="path separators"):
+        chip_loader._safe_chip_id("../../etc/passwd")
+
+
+def test_safe_chip_id_rejects_backslash() -> None:
+    with pytest.raises(ValueError, match="path separators"):
+        chip_loader._safe_chip_id("..\\..\\windows\\system32")
+
+
+def test_safe_chip_id_rejects_dotdot() -> None:
+    with pytest.raises(ValueError, match="path traversal"):
+        chip_loader._safe_chip_id("foo..bar")
+
+
+def test_safe_chip_id_rejects_empty() -> None:
+    with pytest.raises(ValueError, match="required"):
+        chip_loader._safe_chip_id("")
+
+
+def test_safe_chip_id_rejects_whitespace_only() -> None:
+    with pytest.raises(ValueError, match="required"):
+        chip_loader._safe_chip_id("   ")
+
+
+def test_safe_chip_id_accepts_valid_id() -> None:
+    assert chip_loader._safe_chip_id("founder-operator") == "founder-operator"
+
+
+def test_safe_chip_id_strips_whitespace() -> None:
+    assert chip_loader._safe_chip_id("  founder-operator  ") == "founder-operator"
+
+
+def test_load_chip_by_id_rejects_traversal_id(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="path"):
+        chip_loader.load_chip_by_id("../../etc/passwd", search_paths=[tmp_path])

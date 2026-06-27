@@ -350,11 +350,18 @@ def load_chip(path: str | Path) -> PersonalityChip:
 
 
 def _safe_chip_id(value: str) -> str:
+    """Reject chip ids that could escape the chip lab directory tree."""
     chip_id = str(value or "").strip()
     if not chip_id:
         raise ValueError("Personality chip id is required.")
     if "/" in chip_id or "\\" in chip_id:
-        raise ValueError(f"Personality chip id must not contain path separators: {chip_id!r}")
+        raise ValueError(
+            f"Personality chip id must not contain path separators: {chip_id!r}"
+        )
+    if ".." in chip_id:
+        raise ValueError(
+            f"Personality chip id must not contain path traversal sequences: {chip_id!r}"
+        )
     return chip_id
 
 
