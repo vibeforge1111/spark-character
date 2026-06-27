@@ -37,6 +37,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from .chip_loader import PersonalityChip, default_chip_lab_paths, validate_chip_yaml_spec
@@ -45,6 +46,18 @@ DEFAULT_LAB_PATH = Path(os.path.expanduser(
     "~/.spark/spark-personality-chip-labs/personalities"
 ))
 
+
+def _atomic_write_yaml(target: Path, content: str) -> None:
+    """Write *content* to *target* atomically via temp-file + rename."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(target.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        os.replace(tmp, target)
+    except BaseException:
+        os.unlink(tmp)
+        raise
 
 def find_chip_lab_path() -> Path | None:
     """Locate the chip lab personalities directory if installed locally."""
@@ -121,10 +134,7 @@ def promote_evolved_persona_to_chip_lab(
     out["voice_rules_override"] = persona_markdown.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
-        yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
+    _atomic_write_yaml(target, yaml.safe_dump(out, sort_keys=False, allow_unicode=True))
     return target
 
 
@@ -175,8 +185,5 @@ def promote_evolved_chip_to_chip_lab(
         spec["voice_rules_override"] = voice_rules_override.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
-        yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
+    _atomic_write_yaml(target, yaml.safe_dump(spec, sort_keys=False, allow_unicode=True))
     return target
