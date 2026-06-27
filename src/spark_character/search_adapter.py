@@ -209,8 +209,16 @@ def _duckduckgo_html_search(query: str) -> list[SearchResult]:
             "Chrome/120.0 Safari/537.36"
         ),
     }
-    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+    with httpx.Client(timeout=8.0, follow_redirects=False) as client:
         resp = client.get(url, params={"q": query}, headers=headers)
+        # Manually follow at most 1 redirect, only if the target stays
+        # within the expected DuckDuckGo domain. This prevents SSRF via
+        # a compromised redirect to internal/cloud-metadata endpoints.
+        if resp.is_redirect:
+            location = resp.headers.get("location", "")
+            parsed = urlparse(location)
+            if parsed.hostname and parsed.hostname.endswith("duckduckgo.com"):
+                resp = client.get(location, headers=headers)
         resp.raise_for_status()
         html_text = resp.text
     return _parse_duckduckgo_html(html_text)
