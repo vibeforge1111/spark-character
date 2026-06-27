@@ -144,12 +144,19 @@ def _first_sentence(text: str) -> str:
     return parts[0] if parts else stripped
 
 
+_CJK_PATTERN = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿]")
+
+
 def _voice_score(text: str) -> tuple[float, str]:
     if not text.strip():
         return 0.0, "empty"
     robotic_hits = ROBOTIC_PATTERN.findall(text)
     warm_hits = WARM_PATTERN.findall(text)
-    word_count = len(text.split())
+    # CJK scripts use no spaces, so text.split() reports ~1 word for an entire
+    # paragraph and the verbosity guard never triggers. Count CJK ideographs
+    # individually and add them to the whitespace-token count so long Chinese
+    # / Japanese / Korean replies are scored alongside long English ones.
+    word_count = len(text.split()) + len(_CJK_PATTERN.findall(text))
     too_long_penalty = 0.0
     if word_count > 200:
         too_long_penalty = min(0.4, (word_count - 200) / 400)
