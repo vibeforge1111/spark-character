@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -123,15 +124,21 @@ class AuditMiner:
     ) -> AuditFindings:
         if not self.log_path.exists():
             return AuditFindings()
-        lines = self.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        # Stream the tail of the file instead of reading the entire
+        # unbounded gateway-outbound.jsonl into memory.  ``deque`` with
+        # *maxlen* keeps only the most-recent lines as we iterate, so
+        # peak memory is O(limit) rather than O(file_size).
+        headroom = max(limit * 3, 200)
+        with open(self.log_path, encoding="utf-8", errors="replace") as fh:
+            tail: deque[str] = deque(fh, maxlen=headroom)
         # Most recent first
         rows: list[dict[str, Any]] = []
-        for raw in reversed(lines):
-            raw = raw.strip()
-            if not raw:
+        for raw_line in reversed(tail):
+            raw_line = raw_line.rstrip("\n\r")
+            if not raw_line:
                 continue
             try:
-                row = json.loads(raw)
+                row = json.loads(raw_line)
             except json.JSONDecodeError:
                 continue
             if only_user and str(row.get("telegram_user_id") or "") != only_user:
