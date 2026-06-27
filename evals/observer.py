@@ -108,6 +108,33 @@ def _load_seen(path: Path) -> set[str]:
         return set()
 
 
+def _load_seen_from_observations(obs_path: Path) -> set[str]:
+    """Recover trace_refs already written to the observations JSONL.
+
+    Supplements _load_seen so that trace_refs lost between periodic saves
+    of the seen-file are still detected after a process restart.
+    """
+    if not obs_path.exists():
+        return set()
+    refs: set[str] = set()
+    try:
+        with obs_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                    ref = row.get("trace_ref")
+                    if ref:
+                        refs.add(ref)
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+    except Exception:
+        return set()
+    return refs
+
+
 def _save_seen(path: Path, seen: set[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Cap stored IDs to last 5000 to bound state size
@@ -298,6 +325,9 @@ def main() -> int:
     _write_heartbeat(heartbeat_path, "boot")
 
     seen = _load_seen(seen_path)
+    # Also recover trace_refs from the observations JSONL in case the
+    # seen-file is stale (e.g. process crashed between periodic saves).
+    seen |= _load_seen_from_observations(obs_path)
     observed_count = 0
 
     def process_row(row: dict) -> None:
