@@ -1,0 +1,81 @@
+{
+  "schema": "spark-compete-hotfix-v1",
+  "event": "spark-compete-first-event",
+  "submission_mode": "public_repo_pr",
+  "submission_target_url": "https://github.com/vibeforge1111/spark-character/pull/252",
+  "team": {
+    "name": "esc1200",
+    "members": ["drophub_sir", "esc1200", "hermes-agent"],
+    "llm_device_holder": "esc1200",
+    "device_holder_github": "https://github.com/Esc1200",
+    "github_accounts": ["Esc1200"]
+  },
+  "target_repo": {
+    "id": "vibeforge1111/spark-character",
+    "source": "https://github.com/vibeforge1111/spark-character",
+    "owner_surface": "spark-character"
+  },
+  "issue": {
+    "type": "bug",
+    "severity": "medium",
+    "title": "evals/observer.py _load_seen() silently swallows errors loading seen-traces JSON",
+    "actual_behavior": "In evals/observer.py _load_seen() (lines 107-108), a bare `except Exception: return set()` silently swallows any error loading the seen-traces JSON file — including JSONDecodeError from corruption, PermissionError, or any other failure. The observer then treats ALL traces as unseen, potentially re-processing thousands of observations without any log output indicating the problem.",
+    "expected_behavior": "When the seen-traces file cannot be loaded, the observer should log a warning with the full traceback so operators can diagnose the failure (corrupted file, permission issue, disk error, etc.) rather than silently proceeding with an empty set.",
+    "repro_steps": [
+      "Read evals/observer.py and locate _load_seen() (lines 101-108 on master).",
+      "Observe that lines 107-108 have a bare `except Exception: return set()` with no logging.",
+      "If evals/_observer_seen.json is corrupted (e.g. truncated, invalid JSON), the exception is silently swallowed.",
+      "The observer returns an empty set, causing all traces to be treated as unseen and re-processed."
+    ],
+    "affected_workflow": "Live observation of Spark Telegram replies — the seen-traces deduplication mechanism silently fails, leading to redundant LLM calls and duplicate observation entries."
+  },
+  "evidence": {
+    "safe_links_only": true,
+    "before_after_proof": "BEFORE (master): Lines 107-108 have `except Exception: return set()` — any failure loading the JSON file is silently swallowed with zero log output.\n\nAFTER (PR branch): The except block now calls `logging.warning('Failed to load seen-traces file %s; treating all traces as unseen', path, exc_info=True)` before returning the empty set. This produces a visible warning with full traceback in the observer's log output, allowing operators to diagnose file corruption, permission errors, or other load failures.",
+    "links": [
+      "https://github.com/vibeforge1111/spark-character/pull/252",
+      "https://github.com/vibeforge1111/spark-character/blob/master/evals/observer.py"
+    ],
+    "forbidden": [
+      "Do not claim merge approval",
+      "Do not claim CI passed unless verified",
+      "Do not fabricate test output"
+    ]
+  },
+  "proposed_fix": {
+    "approach": "Add `import logging` to the imports and replace the bare `except Exception: return set()` in _load_seen() with a `logging.warning()` call that includes `exc_info=True` to emit the full traceback. The function still returns set() on failure (safe fallback), but now the failure is visible in logs. No behavioral change for the success path.",
+    "files_expected": [
+      "evals/observer.py"
+    ],
+    "tests_or_smoke": "Syntax check passes on the modified file. The change is additive (one import, one logging call) and does not alter any control flow or return values."
+  },
+  "pr": {
+    "branch": "esc1200/fix/observer-seen-trace-silent-failure",
+    "title_prefix": "[spark-compete]",
+    "author_github": "Esc1200",
+    "body_must_include": [
+      "packet",
+      "team",
+      "pr_author",
+      "repo",
+      "actual_behavior",
+      "expected_behavior",
+      "repro_steps",
+      "before_after_proof",
+      "tests_or_smoke",
+      "duplicate_notes",
+      "risk_notes",
+      "review_claim"
+    ],
+    "url": "https://github.com/vibeforge1111/spark-character/pull/252"
+  },
+  "review_claim": {
+    "impact_claim": "medium",
+    "evidence_types": [
+      "redacted_terminal_excerpt"
+    ],
+    "duplicate_notes": "Searched open PRs and issues in vibeforge1111/spark-character for observer silent-failure fixes. No known duplicate PRs. This fix adds a single logging.warning call to an otherwise silent exception handler.",
+    "risk_notes": "Very low risk. The change adds one import and one logging call inside an existing except block. No control flow, return values, or external interfaces changed. The function still returns set() on failure. The logging module is stdlib and has no dependency implications.",
+    "review_state_requested": "pr_review"
+  }
+}

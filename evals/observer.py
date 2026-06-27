@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
@@ -105,6 +106,11 @@ def _load_seen(path: Path) -> set[str]:
         data = json.loads(path.read_text(encoding="utf-8"))
         return set(data.get("seen_trace_refs", []))
     except Exception:
+        logging.warning(
+            "Failed to load seen-traces file %s; treating all traces as unseen",
+            path,
+            exc_info=True,
+        )
         return set()
 
 
