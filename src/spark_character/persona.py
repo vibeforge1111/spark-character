@@ -89,6 +89,32 @@ def protect_latest_pointer(path: Path = LATEST_POINTER) -> None:
         os.chmod(path, 0o444)
 
 
+def _has_matching_log_entry(
+    log_path: Path, previous: str, current: str
+) -> bool:
+    """Check if the log already contains an entry for this transition.
+
+    This prevents duplicate entries on crash-retry when the log write
+    succeeded but the subsequent pointer update did not complete.
+    """
+    if not log_path.exists():
+        return False
+    try:
+        lines = log_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if entry.get("current") == current and entry.get("previous") == (previous or None):
+            return True
+    return False
+
+
 def set_latest_persona_version(
     version: str,
     *,
@@ -98,13 +124,36 @@ def set_latest_persona_version(
     log_path: Path = POINTER_CHANGE_LOG,
     artifacts_dir: Path = ARTIFACTS_DIR,
 ) -> None:
-    """Update persona.latest.txt through a validated, logged write path."""
+    """Update persona.latest.txt through a validated, logged write path.
+
+    The changelog entry is written **before** the atomic pointer update so
+    that a crash between the two operations leaves the pointer on the old
+    value (safe to retry) rather than silently missing a log record.  A
+    deduplication guard prevents duplicate log entries when a retry occurs
+    after a crash that happened after the log write but before the pointer
+    update.
+    """
     resolved = validate_persona_version(version)
     artifact_path = artifacts_dir / f"persona.{resolved}.md"
     if not artifact_path.exists():
         raise FileNotFoundError(f"Persona artifact not found: persona.{resolved}.md")
 
     previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
+
+    # --- Log entry (written BEFORE pointer update) -------------------------
+    record = {
+        "changed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "actor": actor,
+        "reason": reason,
+        "previous": previous or None,
+        "current": resolved,
+    }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if not _has_matching_log_entry(log_path, previous, resolved):
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+    # --- Atomic pointer update ---------------------------------------------
     pointer_path.parent.mkdir(parents=True, exist_ok=True)
     if pointer_path.exists():
         os.chmod(pointer_path, 0o666)
@@ -115,16 +164,6 @@ def set_latest_persona_version(
     finally:
         temp_path.unlink(missing_ok=True)
     protect_latest_pointer(pointer_path)
-
-    record = {
-        "changed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "actor": actor,
-        "reason": reason,
-        "previous": previous or None,
-        "current": resolved,
-    }
-    with log_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 def resolve_latest_persona_version() -> str:
