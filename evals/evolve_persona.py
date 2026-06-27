@@ -464,6 +464,7 @@ def main() -> int:
         # Sidecar promotion to spark-personality-chip-labs registry
         try:
             from spark_character import promote_evolved_persona_to_chip_lab
+            from spark_character.registry import ChipLabNotFoundError, PyYamlMissingError
             chip_lab_path = promote_evolved_persona_to_chip_lab(
                 base_chip_id="founder-operator",
                 base_persona_version=f"v{n}",
@@ -473,8 +474,10 @@ def main() -> int:
             )
             if chip_lab_path is not None:
                 print(f"  registry: also wrote {chip_lab_path}")
-            else:
-                print("  registry: chip lab not found locally, skipped sidecar promotion")
+        except PyYamlMissingError:
+            print("  registry: PyYAML not installed, skipped chip lab promotion")
+        except ChipLabNotFoundError:
+            print("  registry: chip lab not found locally, skipped sidecar promotion")
         except Exception as exc:
             print(f"  registry: sidecar promotion failed: {exc}")
     elif promote:

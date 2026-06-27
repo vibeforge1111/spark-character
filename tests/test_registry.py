@@ -9,6 +9,9 @@ import yaml
 
 from spark_character.chip_loader import PersonalityChip
 from spark_character.registry import (
+    ChipLabNotFoundError,
+    ChipLabPromotionError,
+    PyYamlMissingError,
     _personality_yaml_path,
     promote_evolved_chip_to_chip_lab,
     promote_evolved_persona_to_chip_lab,
@@ -144,3 +147,87 @@ def test_chip_promotion_rejects_chip_id_path_escape(tmp_path: Path) -> None:
         )
 
     assert not outside.exists()
+
+
+def test_persona_promotion_raises_pyyaml_missing(monkeypatch) -> None:
+    """PyYAML import failure raises PyYamlMissingError, not None."""
+    import builtins
+    real_import = builtins.__import__
+
+    def no_yaml(name, *args, **kwargs):
+        if name == "yaml":
+            raise ImportError("No module named 'yaml'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_yaml)
+
+    with pytest.raises(PyYamlMissingError, match="PyYAML is required"):
+        promote_evolved_persona_to_chip_lab(
+            base_chip_id="founder-operator",
+            base_persona_version="v8",
+            new_persona_version="v9",
+            persona_markdown="New voice rules",
+            lab_path=Path("/nonexistent"),
+        )
+
+
+def test_persona_promotion_raises_chip_lab_not_found(monkeypatch) -> None:
+    """Missing chip lab raises ChipLabNotFoundError, not None."""
+    monkeypatch.setattr(
+        "spark_character.registry.find_chip_lab_path", lambda: None
+    )
+
+    with pytest.raises(ChipLabNotFoundError, match="Chip lab directory not found"):
+        promote_evolved_persona_to_chip_lab(
+            base_chip_id="founder-operator",
+            base_persona_version="v8",
+            new_persona_version="v9",
+            persona_markdown="New voice rules",
+        )
+
+
+def test_chip_promotion_raises_pyyaml_missing(monkeypatch) -> None:
+    """Chip variant also raises PyYamlMissingError when yaml is missing."""
+    import builtins
+    real_import = builtins.__import__
+
+    def no_yaml(name, *args, **kwargs):
+        if name == "yaml":
+            raise ImportError("No module named 'yaml'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_yaml)
+
+    chip = PersonalityChip(id="founder-operator", name="Founder Operator")
+
+    with pytest.raises(PyYamlMissingError, match="PyYAML is required"):
+        promote_evolved_chip_to_chip_lab(
+            chip=chip,
+            base_chip_id="founder-operator",
+            base_persona_version="v8",
+            new_persona_version="v9",
+            lab_path=Path("/nonexistent"),
+        )
+
+
+def test_chip_promotion_raises_chip_lab_not_found(monkeypatch) -> None:
+    """Chip variant also raises ChipLabNotFoundError when lab is missing."""
+    monkeypatch.setattr(
+        "spark_character.registry.find_chip_lab_path", lambda: None
+    )
+
+    chip = PersonalityChip(id="founder-operator", name="Founder Operator")
+
+    with pytest.raises(ChipLabNotFoundError, match="Chip lab directory not found"):
+        promote_evolved_chip_to_chip_lab(
+            chip=chip,
+            base_chip_id="founder-operator",
+            base_persona_version="v8",
+            new_persona_version="v9",
+        )
+
+
+def test_promotion_exceptions_are_chip_lab_promotion_errors() -> None:
+    """Both specific exceptions inherit from ChipLabPromotionError."""
+    assert issubclass(PyYamlMissingError, ChipLabPromotionError)
+    assert issubclass(ChipLabNotFoundError, ChipLabPromotionError)
