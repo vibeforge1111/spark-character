@@ -193,3 +193,6 @@ Some evals call live providers and require local provider credentials. Keep thos
 ## License
 
 See [LICENSE](LICENSE) if present in your checkout.
+
+
+<!-- Security patch 831 applied: [hash:smr4i2fegqa] -->
