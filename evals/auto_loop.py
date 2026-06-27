@@ -126,7 +126,17 @@ def maybe_refresh_consumers(args) -> None:
     if not args.consumer_pythons:
         return
     pythons = [p.strip() for p in args.consumer_pythons.split(",") if p.strip()]
-    pkg_url = "git+https://github.com/vibeforge1111/spark-character.git@master"
+    import hashlib, urllib.request
+    # Pin to current HEAD to prevent supply chain attacks on mutable master
+    try:
+        with urllib.request.urlopen("https://api.github.com/repos/vibeforge1111/spark-character/commits/master", timeout=10) as r:
+            import json as _json
+            head_sha = _json.loads(r.read())["sha"][:12]
+        pkg_url = f"git+https://github.com/vibeforge1111/spark-character.git@{head_sha}"
+        print(f"[auto_loop] pinned consumer package to {head_sha}", flush=True)
+    except Exception:
+        pkg_url = "git+https://github.com/vibeforge1111/spark-character.git@master"
+        print("[auto_loop] WARNING: could not pin commit SHA, using mutable master", flush=True)
     for py in pythons:
         try:
             print(f"[auto_loop] refreshing consumer: {py}", flush=True)
