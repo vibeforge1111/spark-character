@@ -300,11 +300,11 @@ def _coerce_yaml_dict(spec: dict) -> PersonalityChip:
     prefs = spec.get("preferences") or {}
     safety = spec.get("safety") or {}
     return PersonalityChip(
-        id=str(identity.get("id") or ""),
-        name=str(identity.get("name") or ""),
-        archetype=str(identity.get("archetype") or "builder"),
-        voice_signature=str(identity.get("voice_signature") or ""),
-        tagline=str(identity.get("tagline") or ""),
+        id=str(identity.get("id")) if identity.get("id") is not None else "",
+        name=str(identity.get("name")) if identity.get("name") is not None else "",
+        archetype=str(identity.get("archetype")) if identity.get("archetype") is not None else "builder",
+        voice_signature=str(identity.get("voice_signature")) if identity.get("voice_signature") is not None else "",
+        tagline=str(identity.get("tagline")) if identity.get("tagline") is not None else "",
         openness=float(traits.get("openness", 0.5)),
         conscientiousness=float(traits.get("conscientiousness", 0.5)),
         extraversion=float(traits.get("extraversion", 0.5)),
