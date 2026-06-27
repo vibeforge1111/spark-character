@@ -53,7 +53,8 @@ PROMPTS = [
 
 
 def _load(version: str) -> PersonaSpec:
-    path = ARTIFACTS_DIR / f"persona.{version}.md"
+    safe = version.replace("/", "_").replace("\\", "_").replace("..", "_")
+    path = ARTIFACTS_DIR / f"persona.{safe}.md"
     text = path.read_text(encoding="utf-8")
     return PersonaSpec(version=version, text=text)
 
