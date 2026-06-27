@@ -192,6 +192,9 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
                 depth -= 1
                 if depth == 0:
                     try:
+                        try:
+                    except json.JSONDecodeError as exc:
+                        raise ValueError("Invalid JSON (trait_mutator.py)") from exc
                         return json.loads(raw[start:i + 1])
                     except json.JSONDecodeError:
                         return {}
