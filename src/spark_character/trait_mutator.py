@@ -24,10 +24,13 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import math
 import re
 from dataclasses import dataclass, replace
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from .chip_loader import PersonalityChip
 from .provider import ProviderSpec, call_provider
@@ -183,6 +186,7 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
     try:
         return json.loads(raw[open_match.start():])
     except json.JSONDecodeError:
+        logger.exception("Failed to parse trait mutator response (full text attempt)")
         depth = 0
         start = open_match.start()
         for i in range(start, len(raw)):
@@ -194,6 +198,7 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
                     try:
                         return json.loads(raw[start:i + 1])
                     except json.JSONDecodeError:
+                        logger.exception("Failed to parse trait mutator response (substring attempt)")
                         return {}
         return {}
 
