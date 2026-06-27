@@ -107,10 +107,10 @@ def latest_user_instructions(
             instruction_id=r[0],
             external_user_id=r[1],
             channel_kind=r[2],
-            instruction_text=r[3] or "",
-            source=r[4] or "",
-            status=r[5] or "",
-            created_at=r[6] or "",
+            instruction_text=r[3] if r[3] is not None else "",
+            source=r[4] if r[4] is not None else "",
+            status=r[5] if r[5] is not None else "",
+            created_at=r[6] if r[6] is not None else "",
             archived_at=r[7],
         )
         for r in rows
