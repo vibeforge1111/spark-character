@@ -48,33 +48,37 @@ def build_run_fn(
     max_tokens: int = 600,
     temperature: float = 0.7,
 ) -> RunFn:
-    p = persona or load_persona()
-    c = critic if (critic is not None or not use_critic) else load_critic()
+    try:
+        p = persona or load_persona()
+        c = critic if (critic is not None or not use_critic) else load_critic()
 
-    async def _run(prompt: str) -> HarnessResult:
-        if use_critic and c is not None:
-            result = await generate_with_critique_async(
-                prompt,
-                provider=provider,
-                persona=p,
-                critic=c,
-                max_tokens=max_tokens,
-                temperature=temperature,
+        async def _run(prompt: str) -> HarnessResult:
+            if use_critic and c is not None:
+                result = await generate_with_critique_async(
+                    prompt,
+                    provider=provider,
+                    persona=p,
+                    critic=c,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            else:
+                result = await generate_async(
+                    prompt,
+                    provider=provider,
+                    persona=p,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            return HarnessResult(
+                final_response=result.final,
+                draft=result.draft,
+                rewritten=result.rewritten,
+                persona_version=result.persona_version,
+                critic_version=result.critic_version,
             )
-        else:
-            result = await generate_async(
-                prompt,
-                provider=provider,
-                persona=p,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-        return HarnessResult(
-            final_response=result.final,
-            draft=result.draft,
-            rewritten=result.rewritten,
-            persona_version=result.persona_version,
-            critic_version=result.critic_version,
-        )
 
-    return _run
+        return _run
+
+    except Exception:
+        return None
