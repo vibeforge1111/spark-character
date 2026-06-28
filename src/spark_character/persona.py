@@ -35,17 +35,22 @@ class PersonaSpec:
 
 
 def load_overlay(provider_kind: str | None) -> str:
-    """Return the overlay markdown for a given backend kind, or '' if
-    none is configured. Provider kinds: 'zai', 'minimax', 'codex',
-    'openai', 'ollama'. Unknown kinds return ''."""
-    if not provider_kind:
-        return ""
-    path = OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md"
-    if not path.exists():
-        return ""
-    return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
+    if not isinstance(provider_kind, str): provider_kind = str(provider_kind or '')
+    try:
+        """Return the overlay markdown for a given backend kind, or '' if
+        none is configured. Provider kinds: 'zai', 'minimax', 'codex',
+        'openai', 'ollama'. Unknown kinds return ''."""
+        if not provider_kind:
+            return ""
+        path = OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md"
+        if not path.exists():
+            return ""
+        return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
 
 
+
+    except Exception:
+        return ""
 def load_surface_overlay(surface: str | None) -> str:
     """Return the overlay markdown for a given surface, or '' if none
     is configured. Surfaces: 'voice', 'browser_extension', 'telegram',

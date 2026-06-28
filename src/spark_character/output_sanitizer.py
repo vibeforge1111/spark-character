@@ -42,68 +42,89 @@ def strip_format_controls(text: str) -> str:
 
 
 def replace_em_dashes(text: str, replacement: str = " - ") -> str:
-    """Replace Unicode dash punctuation with a plain hyphen separator.
+    if not isinstance(text, str): text = str(text or '')
+    if not isinstance(replacement, str): replacement = str(replacement or '')
+    try:
+        """Replace Unicode dash punctuation with a plain hyphen separator.
 
-    Default replacement is " - " (space-hyphen-space) to match the
-    typographic role an em dash usually plays as a parenthetical
-    separator. The function then collapses any double spaces this
-    introduces, so existing single-spaced "word — word" becomes
-    "word - word", not "word  -  word".
-    """
-    if not text:
-        return text
-    out = unicodedata.normalize("NFKD", text)
-    out = "".join(replacement if is_dash_punctuation(ch) else ch for ch in out)
-    while "  " in out:
-        out = out.replace("  ", " ")
-    return out
+        Default replacement is " - " (space-hyphen-space) to match the
+        typographic role an em dash usually plays as a parenthetical
+        separator. The function then collapses any double spaces this
+        introduces, so existing single-spaced "word — word" becomes
+        "word - word", not "word  -  word".
+        """
+        if not text:
+            return text
+        out = unicodedata.normalize("NFKD", text)
+        out = "".join(replacement if is_dash_punctuation(ch) else ch for ch in out)
+        while "  " in out:
+            out = out.replace("  ", " ")
+        return out
 
 
+
+    except Exception:
+        return ""
 def strip_markdown_emphasis(text: str) -> str:
-    """Remove paired bold/italic emphasis markers while preserving bullets."""
-    if not text:
-        return text
-    out = re.sub(r"\*\*\*([^*\n][\s\S]*?[^*\n])\*\*\*", r"\1", text)
-    out = re.sub(r"\*\*([^*\n][\s\S]*?[^*\n])\*\*", r"\1", out)
-    out = re.sub(r"__([^_\n][\s\S]*?[^_\n])__", r"\1", out)
-    return out
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        """Remove paired bold/italic emphasis markers while preserving bullets."""
+        if not text:
+            return text
+        out = re.sub(r"\*\*\*([^*\n][\s\S]*?[^*\n])\*\*\*", r"\1", text)
+        out = re.sub(r"\*\*([^*\n][\s\S]*?[^*\n])\*\*", r"\1", out)
+        out = re.sub(r"__([^_\n][\s\S]*?[^_\n])__", r"\1", out)
+        return out
 
 
+
+    except Exception:
+        return ""
 def rewrite_spawner_surface_standalone_question(text: str) -> str:
-    """Replace stale standalone-tool questions for existing Spawner surfaces."""
-    if not text:
-        return text
-    lower = text.lower()
-    mentions_spawner_surface = "spawner" in lower and (
-        "kanban" in lower or "canvas" in lower or "mission control" in lower
-    )
-    if not mentions_spawner_surface or "standalone" not in lower:
-        return text
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        """Replace stale standalone-tool questions for existing Spawner surfaces."""
+        if not text:
+            return text
+        lower = text.lower()
+        mentions_spawner_surface = "spawner" in lower and (
+            "kanban" in lower or "canvas" in lower or "mission control" in lower
+        )
+        if not mentions_spawner_surface or "standalone" not in lower:
+            return text
 
-    replacement = (
-        "\n\nSince this lives inside the existing Spawner UI routes, the useful question is: "
-        "which surface should we tighten first - Kanban state accuracy, Canvas execution state, "
-        "or Telegram relay messaging?"
-    )
-    out = re.sub(
-        r"\n?\s*[-*]?\s*Are you thinking this (?:runs locally as|should run locally as|should be) "
-        r"a standalone (?:page|app|tool),\s*or lives? inside the existing Spawner UI routes\?\s*$",
-        replacement,
-        text,
-        flags=re.IGNORECASE,
-    )
-    out = re.sub(
-        r"\n?\s*[-*]?\s*Should this be a standalone (?:page|app|tool),\s*"
-        r"or live inside the existing Spawner UI routes\?\s*$",
-        replacement,
-        out,
-        flags=re.IGNORECASE,
-    )
-    return out
+        replacement = (
+            "\n\nSince this lives inside the existing Spawner UI routes, the useful question is: "
+            "which surface should we tighten first - Kanban state accuracy, Canvas execution state, "
+            "or Telegram relay messaging?"
+        )
+        out = re.sub(
+            r"\n?\s*[-*]?\s*Are you thinking this (?:runs locally as|should run locally as|should be) "
+            r"a standalone (?:page|app|tool),\s*or lives? inside the existing Spawner UI routes\?\s*$",
+            replacement,
+            text,
+            flags=re.IGNORECASE,
+        )
+        out = re.sub(
+            r"\n?\s*[-*]?\s*Should this be a standalone (?:page|app|tool),\s*"
+            r"or live inside the existing Spawner UI routes\?\s*$",
+            replacement,
+            out,
+            flags=re.IGNORECASE,
+        )
+        return out
 
 
+
+    except Exception:
+        return ""
 def sanitize_voice_output(text: str) -> str:
-    """Apply all voice post-processors that are safe to run in production."""
-    return rewrite_spawner_surface_standalone_question(
-        strip_markdown_emphasis(replace_em_dashes(strip_format_controls(text)))
-    )
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        """Apply all voice post-processors that are safe to run in production."""
+        return rewrite_spawner_surface_standalone_question(
+            strip_markdown_emphasis(replace_em_dashes(strip_format_controls(text)))
+        )
+
+    except Exception:
+        return ""
