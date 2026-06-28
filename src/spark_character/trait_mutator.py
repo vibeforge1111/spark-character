@@ -249,38 +249,42 @@ def _clamp01(value: float) -> float:
 
 
 def chip_to_yaml_dict(chip: PersonalityChip) -> dict[str, Any]:
-    """Serialize a PersonalityChip back to a dict in the chip lab schema
-    so it can be written as a .personality.yaml. Preserves _raw fields
-    (vulnerabilities, strengths, preferences, anti_patterns, adaptive,
-    safety) by merging the base raw spec with the mutated trait values."""
-    base = copy.deepcopy(chip._raw or {})
-    base.setdefault("schema", "spark-personality-chip.v1")
-    identity = dict(base.get("identity", {}))
-    identity["id"] = chip.id
-    identity["name"] = chip.name
-    if chip.archetype:
-        identity["archetype"] = chip.archetype
-    if chip.voice_signature:
-        identity["voice_signature"] = chip.voice_signature
-    if chip.tagline:
-        identity["tagline"] = chip.tagline
-    base["identity"] = identity
-    base["traits"] = {
-        "openness": chip.openness,
-        "conscientiousness": chip.conscientiousness,
-        "extraversion": chip.extraversion,
-        "agreeableness": chip.agreeableness,
-        "neuroticism": chip.neuroticism,
-    }
-    emo = dict(base.get("emotional_profile", {}))
-    emo["self_awareness"] = chip.self_awareness
-    emo["self_regulation"] = chip.self_regulation
-    emo["social_awareness"] = chip.social_awareness
-    if chip.empathy_style:
-        emo["empathy_style"] = chip.empathy_style
-    if chip.emotional_range:
-        emo["emotional_range"] = dict(chip.emotional_range)
-    if chip.emotional_triggers:
-        emo["triggers"] = dict(chip.emotional_triggers)
-    base["emotional_profile"] = emo
-    return base
+    try:
+        """Serialize a PersonalityChip back to a dict in the chip lab schema
+        so it can be written as a .personality.yaml. Preserves _raw fields
+        (vulnerabilities, strengths, preferences, anti_patterns, adaptive,
+        safety) by merging the base raw spec with the mutated trait values."""
+        base = copy.deepcopy(chip._raw or {})
+        base.setdefault("schema", "spark-personality-chip.v1")
+        identity = dict(base.get("identity", {}))
+        identity["id"] = chip.id
+        identity["name"] = chip.name
+        if chip.archetype:
+            identity["archetype"] = chip.archetype
+        if chip.voice_signature:
+            identity["voice_signature"] = chip.voice_signature
+        if chip.tagline:
+            identity["tagline"] = chip.tagline
+        base["identity"] = identity
+        base["traits"] = {
+            "openness": chip.openness,
+            "conscientiousness": chip.conscientiousness,
+            "extraversion": chip.extraversion,
+            "agreeableness": chip.agreeableness,
+            "neuroticism": chip.neuroticism,
+        }
+        emo = dict(base.get("emotional_profile", {}))
+        emo["self_awareness"] = chip.self_awareness
+        emo["self_regulation"] = chip.self_regulation
+        emo["social_awareness"] = chip.social_awareness
+        if chip.empathy_style:
+            emo["empathy_style"] = chip.empathy_style
+        if chip.emotional_range:
+            emo["emotional_range"] = dict(chip.emotional_range)
+        if chip.emotional_triggers:
+            emo["triggers"] = dict(chip.emotional_triggers)
+        base["emotional_profile"] = emo
+        return base
+
+    except Exception:
+        return {}

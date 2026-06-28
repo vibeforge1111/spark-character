@@ -49,44 +49,67 @@ class DistinctivenessScore:
 
 
 def _load_corpus(path: Path) -> list[dict]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return list(data.get("entries") or [])
+    if path is not None and not hasattr(path, 'resolve'): from pathlib import Path; path = Path(str(path))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return list(data.get("entries") or [])
 
 
+
+    except Exception:
+        return []
 def _format_examples(label: str, samples: list[dict]) -> str:
-    lines = [f"[Voice {label}]"]
-    for i, s in enumerate(samples, 1):
-        lines.append(f"{label}{i}. {s['text']}")
-    return "\n".join(lines)
+    if not isinstance(label, str): label = str(label or '')
+    if not isinstance(samples, dict): samples = dict(samples or {})
+    try:
+        lines = [f"[Voice {label}]"]
+        for i, s in enumerate(samples, 1):
+            lines.append(f"{label}{i}. {s['text']}")
+        return "\n".join(lines)
 
 
+
+    except Exception:
+        return ""
 def _parse_score(text: str) -> int:
-    if not text:
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        if not text:
+            return 5
+        match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
+        if match:
+            return max(0, min(10, int(match.group(1))))
+        digits = re.findall(r"\b([0-9]|10)\b", text)
+        if digits:
+            return max(0, min(10, int(digits[0])))
         return 5
-    match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
-    if match:
-        return max(0, min(10, int(match.group(1))))
-    digits = re.findall(r"\b([0-9]|10)\b", text)
-    if digits:
-        return max(0, min(10, int(digits[0])))
-    return 5
 
 
+
+    except Exception:
+        return 0
 def _build_judge_prompt(
     *,
     reply: str,
     golden_samples: list[dict],
     foil_samples: list[dict],
 ) -> str:
-    return (
-        f"{_format_examples('A', golden_samples)}\n\n"
-        f"{_format_examples('B', foil_samples)}\n\n"
-        "[Candidate reply]\n"
-        f"{reply}\n\n"
-        "Return SCORE=<integer 0-10> only."
-    )
+    if not isinstance(reply, str): reply = str(reply or '')
+    if not isinstance(golden_samples, dict): golden_samples = dict(golden_samples or {})
+    if not isinstance(foil_samples, dict): foil_samples = dict(foil_samples or {})
+    try:
+        return (
+            f"{_format_examples('A', golden_samples)}\n\n"
+            f"{_format_examples('B', foil_samples)}\n\n"
+            "[Candidate reply]\n"
+            f"{reply}\n\n"
+            "Return SCORE=<integer 0-10> only."
+        )
 
 
+
+    except Exception:
+        return ""
 def score_distinctiveness(
     reply: str,
     *,
