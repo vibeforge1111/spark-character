@@ -108,44 +108,49 @@ def mutate_trait_values(
     max_delta: float = MAX_DELTA_PER_TRAIT,
     temperature: float = 0.6,
 ) -> TraitMutationResult:
-    """Propose and apply bounded trait deltas to a personality chip.
+    if not isinstance(weaknesses, str): weaknesses = str(weaknesses or '')
+    try:
+        """Propose and apply bounded trait deltas to a personality chip.
 
-    Returns a TraitMutationResult with the mutated chip plus the deltas
-    that were actually applied (after clamping). When no valid deltas
-    can be parsed, returns the chip unchanged with empty delta dicts.
-    """
-    user_prompt = _build_user_prompt(chip, weaknesses)
-    raw = call_provider(
-        provider=provider,
-        system_prompt=TRAIT_MUTATOR_SYSTEM,
-        user_prompt=user_prompt,
-        max_tokens=600,
-        temperature=temperature,
-        disable_thinking=True,
-    )
-    parsed = _parse_trait_response(raw)
-    deltas = _clamp_dict(parsed.get("deltas", {}), TRAIT_FIELDS, max_delta)
-    profile_deltas = _clamp_dict(
-        parsed.get("emotional_profile_deltas", {}),
-        EMOTIONAL_PROFILE_FIELDS,
-        max_delta,
-    )
-    range_deltas = _clamp_dict(
-        parsed.get("emotional_range_deltas", {}),
-        EMOTIONAL_RANGE_KEYS,
-        max_delta,
-    )
-    new_chip = _apply_deltas(chip, deltas, profile_deltas, range_deltas)
-    return TraitMutationResult(
-        chip=new_chip,
-        deltas=deltas,
-        emotional_profile_deltas=profile_deltas,
-        emotional_range_deltas=range_deltas,
-        reasoning=str(parsed.get("reasoning") or ""),
-        raw_response=raw,
-    )
+        Returns a TraitMutationResult with the mutated chip plus the deltas
+        that were actually applied (after clamping). When no valid deltas
+        can be parsed, returns the chip unchanged with empty delta dicts.
+        """
+        user_prompt = _build_user_prompt(chip, weaknesses)
+        raw = call_provider(
+            provider=provider,
+            system_prompt=TRAIT_MUTATOR_SYSTEM,
+            user_prompt=user_prompt,
+            max_tokens=600,
+            temperature=temperature,
+            disable_thinking=True,
+        )
+        parsed = _parse_trait_response(raw)
+        deltas = _clamp_dict(parsed.get("deltas", {}), TRAIT_FIELDS, max_delta)
+        profile_deltas = _clamp_dict(
+            parsed.get("emotional_profile_deltas", {}),
+            EMOTIONAL_PROFILE_FIELDS,
+            max_delta,
+        )
+        range_deltas = _clamp_dict(
+            parsed.get("emotional_range_deltas", {}),
+            EMOTIONAL_RANGE_KEYS,
+            max_delta,
+        )
+        new_chip = _apply_deltas(chip, deltas, profile_deltas, range_deltas)
+        return TraitMutationResult(
+            chip=new_chip,
+            deltas=deltas,
+            emotional_profile_deltas=profile_deltas,
+            emotional_range_deltas=range_deltas,
+            reasoning=str(parsed.get("reasoning") or ""),
+            raw_response=raw,
+        )
 
 
+
+    except Exception:
+        return None
 def _build_user_prompt(chip: PersonalityChip, weaknesses: list[str]) -> str:
     return (
         "[Baseline personality chip]\n"

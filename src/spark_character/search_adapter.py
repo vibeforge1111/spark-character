@@ -174,29 +174,39 @@ _SNIPPET_RE = re.compile(
 
 
 def _parse_duckduckgo_html(text: str) -> list[SearchResult]:
-    results: list[SearchResult] = []
-    titles = _RESULT_BLOCK_RE.findall(text or "")
-    snippets = _SNIPPET_RE.findall(text or "")
-    for i, (raw_url, raw_title) in enumerate(titles[:10]):
-        clean_title = _strip_tags(html.unescape(raw_title)).strip()
-        clean_snippet = ""
-        if i < len(snippets):
-            clean_snippet = _strip_tags(html.unescape(snippets[i])).strip()
-        url = raw_url
-        if url.startswith("//duckduckgo.com/l/?uddg="):
-            try:
-                from urllib.parse import unquote, urlparse, parse_qs
-                parsed = urlparse(url)
-                qs = parse_qs(parsed.query)
-                if qs.get("uddg"):
-                    url = unquote(qs["uddg"][0])
-            except Exception:
-                pass
-        if not clean_title and not clean_snippet:
-            continue
-        results.append(SearchResult(title=clean_title, snippet=clean_snippet, url=url))
-    return results
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        results: list[SearchResult] = []
+        titles = _RESULT_BLOCK_RE.findall(text or "")
+        snippets = _SNIPPET_RE.findall(text or "")
+        for i, (raw_url, raw_title) in enumerate(titles[:10]):
+            clean_title = _strip_tags(html.unescape(raw_title)).strip()
+            clean_snippet = ""
+            if i < len(snippets):
+                clean_snippet = _strip_tags(html.unescape(snippets[i])).strip()
+            url = raw_url
+            if url.startswith("//duckduckgo.com/l/?uddg="):
+                try:
+                    from urllib.parse import unquote, urlparse, parse_qs
+                    parsed = urlparse(url)
+                    qs = parse_qs(parsed.query)
+                    if qs.get("uddg"):
+                        url = unquote(qs["uddg"][0])
+                except Exception:
+                    pass
+            if not clean_title and not clean_snippet:
+                continue
+            results.append(SearchResult(title=clean_title, snippet=clean_snippet, url=url))
+        return results
 
 
+
+    except Exception:
+        return []
 def _strip_tags(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text)
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        return re.sub(r"<[^>]+>", "", text)
+
+    except Exception:
+        return ""

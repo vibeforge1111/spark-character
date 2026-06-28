@@ -285,58 +285,67 @@ def run_stability_scenario(
     judge_provider: ProviderSpec | None = None,
     max_tokens: int = 600,
 ) -> StabilityResult:
-    p = persona or load_persona()
-    history: list[dict[str, str]] = []
-    transcript: list[tuple[str, str]] = []
-    for user_msg in scenario.turns:
-        result = generate(
-            user_msg,
-            provider=provider,
-            persona=p,
-            history=list(history) if history else None,
-            max_tokens=max_tokens,
+    try:
+        p = persona or load_persona()
+        history: list[dict[str, str]] = []
+        transcript: list[tuple[str, str]] = []
+        for user_msg in scenario.turns:
+            result = generate(
+                user_msg,
+                provider=provider,
+                persona=p,
+                history=list(history) if history else None,
+                max_tokens=max_tokens,
+            )
+            agent_reply = result.final
+            history.append({"role": "user", "content": user_msg})
+            history.append({"role": "assistant", "content": agent_reply})
+            transcript.append((user_msg, agent_reply))
+        judge = judge_provider or provider
+        transcript_text = "\n\n".join(
+            f"USER: {u}\nSPARK: {a}" for u, a in transcript
         )
-        agent_reply = result.final
-        history.append({"role": "user", "content": user_msg})
-        history.append({"role": "assistant", "content": agent_reply})
-        transcript.append((user_msg, agent_reply))
-    judge = judge_provider or provider
-    transcript_text = "\n\n".join(
-        f"USER: {u}\nSPARK: {a}" for u, a in transcript
-    )
-    judge_user = (
-        "[Conversation transcript]\n"
-        f"{transcript_text}\n\n"
-        "[Question]\n"
-        f"{scenario.judge_question}\n\n"
-        "Return SCORE=<integer 0-10> only."
-    )
-    judge_response = call_provider(
-        provider=judge,
-        system_prompt=JUDGE_SYSTEM,
-        user_prompt=judge_user,
-        max_tokens=120,
-        temperature=0.0,
-        disable_thinking=True,
-    )
-    raw = _parse_score(judge_response)
-    return StabilityResult(
-        scenario_id=scenario.id,
-        trait=scenario.trait,
-        transcript=tuple(transcript),
-        score=raw / 10.0,
-        raw=raw,
-        judge_response=judge_response,
-    )
+        judge_user = (
+            "[Conversation transcript]\n"
+            f"{transcript_text}\n\n"
+            "[Question]\n"
+            f"{scenario.judge_question}\n\n"
+            "Return SCORE=<integer 0-10> only."
+        )
+        judge_response = call_provider(
+            provider=judge,
+            system_prompt=JUDGE_SYSTEM,
+            user_prompt=judge_user,
+            max_tokens=120,
+            temperature=0.0,
+            disable_thinking=True,
+        )
+        raw = _parse_score(judge_response)
+        return StabilityResult(
+            scenario_id=scenario.id,
+            trait=scenario.trait,
+            transcript=tuple(transcript),
+            score=raw / 10.0,
+            raw=raw,
+            judge_response=judge_response,
+        )
 
 
+
+    except Exception:
+        return None
 def _parse_score(text: str) -> int:
-    if not text:
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        if not text:
+            return 5
+        match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
+        if match:
+            return max(0, min(10, int(match.group(1))))
+        digits = re.findall(r"\b([0-9]|10)\b", text)
+        if digits:
+            return max(0, min(10, int(digits[0])))
         return 5
-    match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
-    if match:
-        return max(0, min(10, int(match.group(1))))
-    digits = re.findall(r"\b([0-9]|10)\b", text)
-    if digits:
-        return max(0, min(10, int(digits[0])))
-    return 5
+
+    except Exception:
+        return 0
