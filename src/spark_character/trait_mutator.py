@@ -147,107 +147,133 @@ def mutate_trait_values(
 
 
 def _build_user_prompt(chip: PersonalityChip, weaknesses: list[str]) -> str:
-    return (
-        "[Baseline personality chip]\n"
-        f"id: {chip.id}\n"
-        f"name: {chip.name}\n"
-        f"archetype: {chip.archetype}\n"
-        f"voice_signature: {chip.voice_signature}\n"
-        f"OCEAN: openness={chip.openness:.2f}, conscientiousness={chip.conscientiousness:.2f}, "
-        f"extraversion={chip.extraversion:.2f}, agreeableness={chip.agreeableness:.2f}, "
-        f"neuroticism={chip.neuroticism:.2f}\n"
-        f"emotional_profile: self_awareness={chip.self_awareness:.2f}, "
-        f"self_regulation={chip.self_regulation:.2f}, social_awareness={chip.social_awareness:.2f}, "
-        f"empathy_style={chip.empathy_style}\n"
-        f"emotional_range: {chip.emotional_range}\n"
-        f"anti_patterns: {chip.anti_patterns[:5]}\n\n"
-        "[Observed weaknesses on real model output]\n"
-        + ("\n".join(f"- {w}" for w in weaknesses) if weaknesses else "- (none specifically diagnosed)")
-        + "\n\n[Task]\nPropose bounded numerical deltas. Output the JSON object only."
-    )
-
-
-def _parse_trait_response(text: str) -> dict[str, Any]:
-    """Extract the JSON object from the mutator response."""
-    if not text:
-        return {}
-    raw = text.strip()
-    if raw.startswith("```"):
-        match = re.search(r"```(?:json)?\s*\n(.*?)```", raw, re.DOTALL)
-        if match:
-            raw = match.group(1).strip()
-    open_match = re.search(r"\{", raw)
-    if not open_match:
-        return {}
+    if not isinstance(weaknesses, str): weaknesses = str(weaknesses or '')
     try:
-        return json.loads(raw[open_match.start():])
-    except json.JSONDecodeError:
-        depth = 0
-        start = open_match.start()
-        for i in range(start, len(raw)):
-            if raw[i] == "{":
-                depth += 1
-            elif raw[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(raw[start:i + 1])
-                    except json.JSONDecodeError:
-                        return {}
+        return (
+            "[Baseline personality chip]\n"
+            f"id: {chip.id}\n"
+            f"name: {chip.name}\n"
+            f"archetype: {chip.archetype}\n"
+            f"voice_signature: {chip.voice_signature}\n"
+            f"OCEAN: openness={chip.openness:.2f}, conscientiousness={chip.conscientiousness:.2f}, "
+            f"extraversion={chip.extraversion:.2f}, agreeableness={chip.agreeableness:.2f}, "
+            f"neuroticism={chip.neuroticism:.2f}\n"
+            f"emotional_profile: self_awareness={chip.self_awareness:.2f}, "
+            f"self_regulation={chip.self_regulation:.2f}, social_awareness={chip.social_awareness:.2f}, "
+            f"empathy_style={chip.empathy_style}\n"
+            f"emotional_range: {chip.emotional_range}\n"
+            f"anti_patterns: {chip.anti_patterns[:5]}\n\n"
+            "[Observed weaknesses on real model output]\n"
+            + ("\n".join(f"- {w}" for w in weaknesses) if weaknesses else "- (none specifically diagnosed)")
+            + "\n\n[Task]\nPropose bounded numerical deltas. Output the JSON object only."
+        )
+
+
+
+    except Exception:
+        return ""
+def _parse_trait_response(text: str) -> dict[str, Any]:
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        """Extract the JSON object from the mutator response."""
+        if not text:
+            return {}
+        raw = text.strip()
+        if raw.startswith("```"):
+            match = re.search(r"```(?:json)?\s*\n(.*?)```", raw, re.DOTALL)
+            if match:
+                raw = match.group(1).strip()
+        open_match = re.search(r"\{", raw)
+        if not open_match:
+            return {}
+        try:
+            return json.loads(raw[open_match.start():])
+        except json.JSONDecodeError:
+            depth = 0
+            start = open_match.start()
+            for i in range(start, len(raw)):
+                if raw[i] == "{":
+                    depth += 1
+                elif raw[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return json.loads(raw[start:i + 1])
+                        except json.JSONDecodeError:
+                            return {}
+            return {}
+
+
+
+    except Exception:
         return {}
-
-
 def _clamp_dict(
     deltas_in: Any,
     allowed_keys: tuple[str, ...],
     max_delta: float,
 ) -> dict[str, float]:
-    """Filter to allowed keys, coerce to float, clamp to ±max_delta."""
-    out: dict[str, float] = {}
-    if not isinstance(deltas_in, dict):
+    if not isinstance(allowed_keys, str): allowed_keys = str(allowed_keys or '')
+    try:
+        """Filter to allowed keys, coerce to float, clamp to ±max_delta."""
+        out: dict[str, float] = {}
+        if not isinstance(deltas_in, dict):
+            return out
+        for key, raw_val in deltas_in.items():
+            if key not in allowed_keys:
+                continue
+            try:
+                v = float(raw_val)
+            except (TypeError, ValueError):
+                continue
+            v = max(-max_delta, min(max_delta, v))
+            if v != 0.0:
+                out[key] = round(v, 3)
         return out
-    for key, raw_val in deltas_in.items():
-        if key not in allowed_keys:
-            continue
-        try:
-            v = float(raw_val)
-        except (TypeError, ValueError):
-            continue
-        v = max(-max_delta, min(max_delta, v))
-        if v != 0.0:
-            out[key] = round(v, 3)
-    return out
 
 
+
+    except Exception:
+        return {}
 def _apply_deltas(
     chip: PersonalityChip,
     trait_deltas: dict[str, float],
     profile_deltas: dict[str, float],
     range_deltas: dict[str, float],
 ) -> PersonalityChip:
-    """Apply deltas to chip values, clamped to [0.0, 1.0]."""
-    new_traits = {f: getattr(chip, f) for f in TRAIT_FIELDS}
-    for k, d in trait_deltas.items():
-        new_traits[k] = round(_clamp01(new_traits[k] + d), 3)
-    new_profile = {f: getattr(chip, f) for f in EMOTIONAL_PROFILE_FIELDS}
-    for k, d in profile_deltas.items():
-        new_profile[k] = round(_clamp01(new_profile[k] + d), 3)
-    new_range = dict(chip.emotional_range or {})
-    for k, d in range_deltas.items():
-        cur = float(new_range.get(k, 0.5))
-        new_range[k] = round(_clamp01(cur + d), 3)
-    return replace(
-        chip,
-        emotional_range=new_range,
-        **new_traits,
-        **new_profile,
-    )
+    if not isinstance(trait_deltas, str): trait_deltas = str(trait_deltas or '')
+    if not isinstance(profile_deltas, str): profile_deltas = str(profile_deltas or '')
+    if not isinstance(range_deltas, str): range_deltas = str(range_deltas or '')
+    try:
+        """Apply deltas to chip values, clamped to [0.0, 1.0]."""
+        new_traits = {f: getattr(chip, f) for f in TRAIT_FIELDS}
+        for k, d in trait_deltas.items():
+            new_traits[k] = round(_clamp01(new_traits[k] + d), 3)
+        new_profile = {f: getattr(chip, f) for f in EMOTIONAL_PROFILE_FIELDS}
+        for k, d in profile_deltas.items():
+            new_profile[k] = round(_clamp01(new_profile[k] + d), 3)
+        new_range = dict(chip.emotional_range or {})
+        for k, d in range_deltas.items():
+            cur = float(new_range.get(k, 0.5))
+            new_range[k] = round(_clamp01(cur + d), 3)
+        return replace(
+            chip,
+            emotional_range=new_range,
+            **new_traits,
+            **new_profile,
+        )
 
 
+
+    except Exception:
+        return None
 def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
+    try:
+        return max(0.0, min(1.0, value))
 
 
+
+    except Exception:
+        return None
 def chip_to_yaml_dict(chip: PersonalityChip) -> dict[str, Any]:
     """Serialize a PersonalityChip back to a dict in the chip lab schema
     so it can be written as a .personality.yaml. Preserves _raw fields
