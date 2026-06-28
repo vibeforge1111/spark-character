@@ -49,51 +49,59 @@ def generate(
     enable_search: bool = False,
     surface: str | None = None,
 ) -> GenerationResult:
-    """Generate a Spark reply. disable_thinking defaults to True so the
-    reasoning phase of reasoning models (GLM 5.1, o1-style) does not
-    leak structured "1. Analyze the Request" prefixes into the visible
-    output when the token budget is tight. Pass False if you want the
-    model to think aloud (only meaningful for some backends).
+    if not isinstance(user_message, str): user_message = str(user_message or '')
+    if not isinstance(history, str): history = str(history or '')
+    if not isinstance(tools, dict): tools = dict(tools or {})
+    if not isinstance(surface, str): surface = str(surface or '')
+    try:
+        """Generate a Spark reply. disable_thinking defaults to True so the
+        reasoning phase of reasoning models (GLM 5.1, o1-style) does not
+        leak structured "1. Analyze the Request" prefixes into the visible
+        output when the token budget is tight. Pass False if you want the
+        model to think aloud (only meaningful for some backends).
 
-    Pass tools=[{...}] to attach native tools the backend supports for
-    this turn (e.g. [{"type": "web_search", "web_search": {"enable": True}}]
-    on Z.AI). The model decides when to call them; the final reply text
-    is returned.
+        Pass tools=[{...}] to attach native tools the backend supports for
+        this turn (e.g. [{"type": "web_search", "web_search": {"enable": True}}]
+        on Z.AI). The model decides when to call them; the final reply text
+        is returned.
 
-    Pass enable_search=True to do a client-side web fetch when the
-    prompt looks like it needs current data (price, news, status,
-    today's, latest). Provider-agnostic: works on every backend even
-    when the backend's native tools= is ignored or unavailable.
+        Pass enable_search=True to do a client-side web fetch when the
+        prompt looks like it needs current data (price, news, status,
+        today's, latest). Provider-agnostic: works on every backend even
+        when the backend's native tools= is ignored or unavailable.
 
-    When persona is None, the active version is loaded with the
-    matching provider overlay automatically (Z.AI, MiniMax, etc.).
-    Pass an explicit persona to override that behavior."""
-    p = persona or load_persona(
-        provider_kind=detect_provider_kind(provider),
-        surface=surface,
-    )
-    final_user_prompt = (
-        attach_search_context(user_message) if enable_search else user_message
-    )
-    draft = call_provider(
-        provider=provider,
-        system_prompt=p.system_prompt,
-        user_prompt=final_user_prompt,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        extra_messages=history,
-        disable_thinking=disable_thinking,
-        tools=tools,
-    )
-    return GenerationResult(
-        final=draft,
-        draft=draft,
-        rewritten=False,
-        persona_version=p.version,
-        critic_version=None,
-    )
+        When persona is None, the active version is loaded with the
+        matching provider overlay automatically (Z.AI, MiniMax, etc.).
+        Pass an explicit persona to override that behavior."""
+        p = persona or load_persona(
+            provider_kind=detect_provider_kind(provider),
+            surface=surface,
+        )
+        final_user_prompt = (
+            attach_search_context(user_message) if enable_search else user_message
+        )
+        draft = call_provider(
+            provider=provider,
+            system_prompt=p.system_prompt,
+            user_prompt=final_user_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            extra_messages=history,
+            disable_thinking=disable_thinking,
+            tools=tools,
+        )
+        return GenerationResult(
+            final=draft,
+            draft=draft,
+            rewritten=False,
+            persona_version=p.version,
+            critic_version=None,
+        )
 
 
+
+    except Exception:
+        return None
 def generate_with_critique(
     user_message: str,
     *,
@@ -106,41 +114,47 @@ def generate_with_critique(
     always_critique: bool = False,
     disable_thinking: bool = True,
 ) -> GenerationResult:
-    """Generate, then run the critic only if the local scorers flag a
-    persona violation in the draft. Set always_critique=True to bypass
-    the gate and run the critic on every reply."""
-    p = persona or load_persona(provider_kind=detect_provider_kind(provider))
-    c = critic or load_critic()
-    draft = call_provider(
-        provider=provider,
-        system_prompt=p.system_prompt,
-        user_prompt=user_message,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        extra_messages=history,
-        disable_thinking=disable_thinking,
-    )
-    if not always_critique and score_persona(draft).passed:
+    if not isinstance(user_message, str): user_message = str(user_message or '')
+    if not isinstance(history, str): history = str(history or '')
+    try:
+        """Generate, then run the critic only if the local scorers flag a
+        persona violation in the draft. Set always_critique=True to bypass
+        the gate and run the critic on every reply."""
+        p = persona or load_persona(provider_kind=detect_provider_kind(provider))
+        c = critic or load_critic()
+        draft = call_provider(
+            provider=provider,
+            system_prompt=p.system_prompt,
+            user_prompt=user_message,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            extra_messages=history,
+            disable_thinking=disable_thinking,
+        )
+        if not always_critique and score_persona(draft).passed:
+            return GenerationResult(
+                final=draft,
+                draft=draft,
+                rewritten=False,
+                persona_version=p.version,
+                critic_version=c.version,
+            )
+        result: CritiqueResult = critique(
+            provider=provider, persona=p, critic=c, draft=draft, max_tokens=max_tokens
+        )
+        final = _accept_rewrite_or_keep(draft, result)
         return GenerationResult(
-            final=draft,
+            final=final,
             draft=draft,
-            rewritten=False,
+            rewritten=final != draft,
             persona_version=p.version,
             critic_version=c.version,
         )
-    result: CritiqueResult = critique(
-        provider=provider, persona=p, critic=c, draft=draft, max_tokens=max_tokens
-    )
-    final = _accept_rewrite_or_keep(draft, result)
-    return GenerationResult(
-        final=final,
-        draft=draft,
-        rewritten=final != draft,
-        persona_version=p.version,
-        critic_version=c.version,
-    )
 
 
+
+    except Exception:
+        return None
 async def generate_async(
     user_message: str,
     *,

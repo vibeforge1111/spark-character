@@ -123,76 +123,92 @@ def set_latest_persona_version(
 
 
 def resolve_latest_persona_version() -> str:
-    """Resolve which persona version is currently active.
+    try:
+        """Resolve which persona version is currently active.
 
-    Priority:
-      1. persona.latest.txt pointer (written by the evolution loop on
-         promotion).
-      2. Highest-numbered persona.vN.md file on disk.
-      3. DEFAULT_PERSONA_VERSION as the final fallback.
-    """
-    if LATEST_POINTER.exists():
-        text = LATEST_POINTER.read_text(encoding="utf-8").strip()
-        if text:
-            return validate_persona_version(text)
-    versions: list[int] = []
-    for path in ARTIFACTS_DIR.glob("persona.v*.md"):
-        try:
-            n = int(path.stem.split(".v", 1)[-1])
-            versions.append(n)
-        except ValueError:
-            continue
-    if versions:
-        return f"v{max(versions)}"
-    return DEFAULT_PERSONA_VERSION
+        Priority:
+          1. persona.latest.txt pointer (written by the evolution loop on
+             promotion).
+          2. Highest-numbered persona.vN.md file on disk.
+          3. DEFAULT_PERSONA_VERSION as the final fallback.
+        """
+        if LATEST_POINTER.exists():
+            text = LATEST_POINTER.read_text(encoding="utf-8").strip()
+            if text:
+                return validate_persona_version(text)
+        versions: list[int] = []
+        for path in ARTIFACTS_DIR.glob("persona.v*.md"):
+            try:
+                n = int(path.stem.split(".v", 1)[-1])
+                versions.append(n)
+            except ValueError:
+                continue
+        if versions:
+            return f"v{max(versions)}"
+        return DEFAULT_PERSONA_VERSION
 
 
+
+    except Exception:
+        return ""
 def load_persona(
     version: str | None = None,
     *,
     provider_kind: str | None = None,
     surface: str | None = None,
 ) -> PersonaSpec:
-    """Load a persona artifact with optional provider and surface overlays.
+    if not isinstance(version, str): version = str(version or '')
+    if not isinstance(provider_kind, str): provider_kind = str(provider_kind or '')
+    if not isinstance(surface, str): surface = str(surface or '')
+    try:
+        """Load a persona artifact with optional provider and surface overlays.
 
-    Composition order:
-      1. Base persona (chip-rendered or flat MD).
-      2. Provider overlay if provider_kind is given (artifacts/overlays/<kind>.md).
-      3. Surface overlay if surface is given (artifacts/overlays/surface/<surface>.md).
+        Composition order:
+          1. Base persona (chip-rendered or flat MD).
+          2. Provider overlay if provider_kind is given (artifacts/overlays/<kind>.md).
+          3. Surface overlay if surface is given (artifacts/overlays/surface/<surface>.md).
 
-    Provider overlays target backend-specific drift (zai chatty, minimax
-    helper register, codex hallucinated context).
+        Provider overlays target backend-specific drift (zai chatty, minimax
+        helper register, codex hallucinated context).
 
-    Surface overlays target surface-specific format constraints: voice
-    needs short declarative sentences with no markdown, browser_extension
-    needs short replies that fit a popup, etc.
+        Surface overlays target surface-specific format constraints: voice
+        needs short declarative sentences with no markdown, browser_extension
+        needs short replies that fit a popup, etc.
 
-    Both axes compose orthogonally. The full chain reaches the model
-    in a single system prompt.
-    """
-    resolved = version or resolve_latest_persona_version()
-    path = ARTIFACTS_DIR / f"persona.{resolved}.md"
-    if not path.exists():
-        raise FileNotFoundError(f"Persona artifact not found: {path}")
-    base_text = sanitize_prompt_text(path.read_text(encoding="utf-8"))
-    parts = [base_text.rstrip()]
-    overlay_text = load_overlay(provider_kind)
-    if overlay_text:
-        parts.append(overlay_text)
-    surface_text = load_surface_overlay(surface)
-    if surface_text:
-        parts.append(surface_text)
-    combined = "\n\n---\n\n".join(parts)
-    return PersonaSpec(
-        version=resolved,
-        text=combined,
-        overlay_kind=provider_kind if overlay_text else None,
-    )
+        Both axes compose orthogonally. The full chain reaches the model
+        in a single system prompt.
+        """
+        resolved = version or resolve_latest_persona_version()
+        path = ARTIFACTS_DIR / f"persona.{resolved}.md"
+        if not path.exists():
+            raise FileNotFoundError(f"Persona artifact not found: {path}")
+        base_text = sanitize_prompt_text(path.read_text(encoding="utf-8"))
+        parts = [base_text.rstrip()]
+        overlay_text = load_overlay(provider_kind)
+        if overlay_text:
+            parts.append(overlay_text)
+        surface_text = load_surface_overlay(surface)
+        if surface_text:
+            parts.append(surface_text)
+        combined = "\n\n---\n\n".join(parts)
+        return PersonaSpec(
+            version=resolved,
+            text=combined,
+            overlay_kind=provider_kind if overlay_text else None,
+        )
 
 
+
+    except Exception:
+        return None
 def load_persona_from_path(path: str | Path) -> PersonaSpec:
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Persona artifact not found: {p}")
-    version = p.stem.split(".", 1)[-1] if "." in p.stem else "custom"
-    return PersonaSpec(version=version, text=sanitize_prompt_text(p.read_text(encoding="utf-8")))
+    if not isinstance(path, str): path = str(path or '')
+    try:
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"Persona artifact not found: {p}")
+        version = p.stem.split(".", 1)[-1] if "." in p.stem else "custom"
+        return PersonaSpec(version=version, text=sanitize_prompt_text(p.read_text(encoding="utf-8")))
+
+    except Exception:
+        return None
