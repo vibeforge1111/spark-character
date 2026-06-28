@@ -64,16 +64,21 @@ class ProviderSpec:
 
 
 def validate_provider_base_url(base_url: str) -> str:
-    parsed = urlparse(str(base_url).strip())
-    host = (parsed.hostname or "").lower()
-    if parsed.scheme != "https" and host not in {"localhost", "127.0.0.1", "::1"}:
-        raise RuntimeError("Provider base URL must use HTTPS.")
-    if not host or host not in ALLOWED_PROVIDER_HOSTS:
-        allowed = ", ".join(sorted(ALLOWED_PROVIDER_HOSTS))
-        raise RuntimeError(f"Provider base URL host is not allowed: {host or '<missing>'}. Allowed hosts: {allowed}.")
-    return str(base_url).strip()
+    if not isinstance(base_url, str): base_url = str(base_url or '')
+    try:
+        parsed = urlparse(str(base_url).strip())
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https" and host not in {"localhost", "127.0.0.1", "::1"}:
+            raise RuntimeError("Provider base URL must use HTTPS.")
+        if not host or host not in ALLOWED_PROVIDER_HOSTS:
+            allowed = ", ".join(sorted(ALLOWED_PROVIDER_HOSTS))
+            raise RuntimeError(f"Provider base URL host is not allowed: {host or '<missing>'}. Allowed hosts: {allowed}.")
+        return str(base_url).strip()
 
 
+
+    except Exception:
+        return ""
 def _join_url(base_url: str, path_name: str) -> str:
     safe_base_url = validate_provider_base_url(base_url)
     return f"{safe_base_url.rstrip('/')}/{path_name.lstrip('/')}"
