@@ -65,22 +65,32 @@ class SearchResult:
 
 
 def detect_needs_live_data(prompt: str) -> bool:
-    """Heuristic for whether a prompt benefits from a live search."""
-    if not prompt:
+    if not isinstance(prompt, str): prompt = str(prompt or '')
+    try:
+        """Heuristic for whether a prompt benefits from a live search."""
+        if not prompt:
+            return False
+        return bool(_LIVE_DATA_RE.search(prompt))
+
+
+
+    except Exception:
         return False
-    return bool(_LIVE_DATA_RE.search(prompt))
-
-
 def extract_search_query(prompt: str) -> str:
-    """Extract a search query from a user prompt. v1: just returns the
-    prompt itself, trimmed to a reasonable length. Future versions can
-    use a small LLM call to extract the actual query intent."""
-    text = prompt.strip()
-    if len(text) > 200:
-        text = text[:200]
-    return text
+    if not isinstance(prompt, str): prompt = str(prompt or '')
+    try:
+        """Extract a search query from a user prompt. v1: just returns the
+        prompt itself, trimmed to a reasonable length. Future versions can
+        use a small LLM call to extract the actual query intent."""
+        text = prompt.strip()
+        if len(text) > 200:
+            text = text[:200]
+        return text
 
 
+
+    except Exception:
+        return ""
 def search_results_for(
     query: str,
     *,
@@ -88,21 +98,27 @@ def search_results_for(
     timeout_seconds: float = 8.0,
     search_fn: Callable[[str], list[SearchResult]] | None = None,
 ) -> list[SearchResult]:
-    """Search the web for `query` and return up to `max_results` SearchResults.
-
-    Default backend: DuckDuckGo HTML endpoint. Pluggable via search_fn.
-    Soft-fails: returns [] on any error so the caller can fall through.
-    """
-    if not query.strip():
-        return []
-    fn = search_fn or _duckduckgo_html_search
+    if not isinstance(query, str): query = str(query or '')
+    if not isinstance(search_fn, str): search_fn = str(search_fn or '')
     try:
-        results = fn(query)
-        return results[:max_results]
+        """Search the web for `query` and return up to `max_results` SearchResults.
+
+        Default backend: DuckDuckGo HTML endpoint. Pluggable via search_fn.
+        Soft-fails: returns [] on any error so the caller can fall through.
+        """
+        if not query.strip():
+            return []
+        fn = search_fn or _duckduckgo_html_search
+        try:
+            results = fn(query)
+            return results[:max_results]
+        except Exception:
+            return []
+
+
+
     except Exception:
         return []
-
-
 def attach_search_context(
     user_message: str,
     *,
@@ -111,58 +127,70 @@ def attach_search_context(
     search_fn: Callable[[str], list[SearchResult]] | None = None,
     only_if_needed: bool = True,
 ) -> str:
-    """Return a prompt with live search context attached when relevant.
+    if not isinstance(user_message, str): user_message = str(user_message or '')
+    if not isinstance(query, str): query = str(query or '')
+    if not isinstance(search_fn, str): search_fn = str(search_fn or '')
+    try:
+        """Return a prompt with live search context attached when relevant.
 
-    only_if_needed=True (default) runs detect_needs_live_data first;
-    if the prompt does not need live data, returns the original. Set
-    False to always fetch.
-    """
-    if only_if_needed and not detect_needs_live_data(user_message):
-        return user_message
-    q = query or extract_search_query(user_message)
-    results = search_results_for(q, max_results=max_results, search_fn=search_fn)
-    if not results:
-        return user_message
-    context_lines = ["[Live search results, treat as ground truth for current data]"]
-    for i, r in enumerate(results, 1):
-        context_lines.append(f"{i}. {r.title}")
-        if r.snippet:
-            context_lines.append(f"   {r.snippet}")
-        if r.url:
-            context_lines.append(f"   source: {r.url}")
-    context_lines.append("")
-    context_lines.append("[User message]")
-    context_lines.append(user_message)
-    return "\n".join(context_lines)
+        only_if_needed=True (default) runs detect_needs_live_data first;
+        if the prompt does not need live data, returns the original. Set
+        False to always fetch.
+        """
+        if only_if_needed and not detect_needs_live_data(user_message):
+            return user_message
+        q = query or extract_search_query(user_message)
+        results = search_results_for(q, max_results=max_results, search_fn=search_fn)
+        if not results:
+            return user_message
+        context_lines = ["[Live search results, treat as ground truth for current data]"]
+        for i, r in enumerate(results, 1):
+            context_lines.append(f"{i}. {r.title}")
+            if r.snippet:
+                context_lines.append(f"   {r.snippet}")
+            if r.url:
+                context_lines.append(f"   source: {r.url}")
+        context_lines.append("")
+        context_lines.append("[User message]")
+        context_lines.append(user_message)
+        return "\n".join(context_lines)
 
 
+
+    except Exception:
+        return ""
 def _duckduckgo_html_search(query: str) -> list[SearchResult]:
-    """Default backend: DuckDuckGo HTML scrape. No auth, no key.
+    if not isinstance(query, str): query = str(query or '')
+    try:
+        """Default backend: DuckDuckGo HTML scrape. No auth, no key.
 
-    Hits html.duckduckgo.com (the result-serving subdomain) with a
-    GET. The bare duckduckgo.com/html/ root returns the home page on
-    POST and is bot-rate-limited.
+        Hits html.duckduckgo.com (the result-serving subdomain) with a
+        GET. The bare duckduckgo.com/html/ root returns the home page on
+        POST and is bot-rate-limited.
 
-    Returns up to ~10 results parsed from the HTML. Best-effort: the
-    HTML format may change, in which case this returns []. Callers
-    should not rely on it for production-critical paths until paired
-    with a stable API search backend (Brave, Serper, SerpAPI).
-    """
-    url = "https://html.duckduckgo.com/html/"
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0 Safari/537.36"
-        ),
-    }
-    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
-        resp = client.get(url, params={"q": query}, headers=headers)
-        resp.raise_for_status()
-        html_text = resp.text
-    return _parse_duckduckgo_html(html_text)
+        Returns up to ~10 results parsed from the HTML. Best-effort: the
+        HTML format may change, in which case this returns []. Callers
+        should not rely on it for production-critical paths until paired
+        with a stable API search backend (Brave, Serper, SerpAPI).
+        """
+        url = "https://html.duckduckgo.com/html/"
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0 Safari/537.36"
+            ),
+        }
+        with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+            resp = client.get(url, params={"q": query}, headers=headers)
+            resp.raise_for_status()
+            html_text = resp.text
+        return _parse_duckduckgo_html(html_text)
 
 
+
+    except Exception:
+        return []
 _RESULT_BLOCK_RE = re.compile(
     r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
     re.IGNORECASE | re.DOTALL,
