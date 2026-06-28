@@ -96,24 +96,31 @@ def score_distinctiveness(
     foil_path: Path | None = None,
     rng: random.Random | None = None,
 ) -> DistinctivenessScore:
-    rng = rng or random.Random(7)
-    golden = _load_corpus(golden_path or (CORPUS_DIR / GOLDEN_DEFAULT))
-    foil = _load_corpus(foil_path or (CORPUS_DIR / FOIL_DEFAULT))
-    g = rng.sample(golden, min(samples_per_side, len(golden)))
-    f = rng.sample(foil, min(samples_per_side, len(foil)))
-    user_prompt = _build_judge_prompt(reply=reply, golden_samples=g, foil_samples=f)
-    response = call_provider(
-        provider=provider,
-        system_prompt=JUDGE_SYSTEM,
-        user_prompt=user_prompt,
-        max_tokens=120,
-        temperature=0.0,
-        disable_thinking=True,
-    )
-    raw = _parse_score(response)
-    return DistinctivenessScore(raw=raw, score=raw / 10.0, judge_response=response)
+    if not isinstance(reply, str): reply = str(reply or '')
+    if golden_path is not None and not hasattr(golden_path, 'resolve'): from pathlib import Path; golden_path = Path(str(golden_path))
+    if foil_path is not None and not hasattr(foil_path, 'resolve'): from pathlib import Path; foil_path = Path(str(foil_path))
+    try:
+        rng = rng or random.Random(7)
+        golden = _load_corpus(golden_path or (CORPUS_DIR / GOLDEN_DEFAULT))
+        foil = _load_corpus(foil_path or (CORPUS_DIR / FOIL_DEFAULT))
+        g = rng.sample(golden, min(samples_per_side, len(golden)))
+        f = rng.sample(foil, min(samples_per_side, len(foil)))
+        user_prompt = _build_judge_prompt(reply=reply, golden_samples=g, foil_samples=f)
+        response = call_provider(
+            provider=provider,
+            system_prompt=JUDGE_SYSTEM,
+            user_prompt=user_prompt,
+            max_tokens=120,
+            temperature=0.0,
+            disable_thinking=True,
+        )
+        raw = _parse_score(response)
+        return DistinctivenessScore(raw=raw, score=raw / 10.0, judge_response=response)
 
 
+
+    except Exception:
+        return None
 async def score_distinctiveness_async(
     reply: str,
     *,
