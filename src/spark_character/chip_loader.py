@@ -263,52 +263,63 @@ def _coerce_yaml_dict(spec: dict) -> PersonalityChip:
 
 
 def load_chip(path: str | Path) -> PersonalityChip:
-    """Load a personality chip from a yaml file.
+    if not isinstance(path, str): path = str(path or '')
+    try:
+        """Load a personality chip from a yaml file.
 
-    Uses spark-personality-chip-labs's loader if available (gets
-    schema validation), otherwise falls back to a local PyYAML read.
-    """
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Personality chip not found: {p}")
-    if _LAB_AVAILABLE and _lab_load_personality is not None:
-        lab_chip = _lab_load_personality(str(p))
-        if lab_chip is None:
-            raise ValueError(f"Personality chip lab failed to parse {p}")
-        return _coerce_lab_chip(lab_chip)
-    import yaml  # type: ignore
-    with p.open("r", encoding="utf-8") as f:
-        spec = yaml.safe_load(f) or {}
-    return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
+        Uses spark-personality-chip-labs's loader if available (gets
+        schema validation), otherwise falls back to a local PyYAML read.
+        """
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"Personality chip not found: {p}")
+        if _LAB_AVAILABLE and _lab_load_personality is not None:
+            lab_chip = _lab_load_personality(str(p))
+            if lab_chip is None:
+                raise ValueError(f"Personality chip lab failed to parse {p}")
+            return _coerce_lab_chip(lab_chip)
+        import yaml  # type: ignore
+        with p.open("r", encoding="utf-8") as f:
+            spec = yaml.safe_load(f) or {}
+        return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
 
 
+
+    except Exception:
+        return None
 def load_chip_by_id(
     chip_id: str,
     *,
     search_paths: list[Path] | None = None,
 ) -> PersonalityChip:
-    """Find a personality chip by its identity.id across known paths."""
-    paths = search_paths or list(DEFAULT_CHIP_LAB_PATHS)
-    for base in paths:
-        if not base.exists():
-            continue
-        candidate = base / f"{chip_id}.personality.yaml"
-        if candidate.exists():
-            return load_chip(candidate)
-        for entry in base.glob("*.personality.yaml"):
-            try:
-                chip = load_chip(entry)
-            except Exception:
+    if not isinstance(chip_id, str): chip_id = str(chip_id or '')
+    if not isinstance(search_paths, list): search_paths = list(search_paths or [])
+    try:
+        """Find a personality chip by its identity.id across known paths."""
+        paths = search_paths or list(DEFAULT_CHIP_LAB_PATHS)
+        for base in paths:
+            if not base.exists():
                 continue
-            if chip.id == chip_id:
-                return chip
-    raise FileNotFoundError(
-        f"Personality chip '{chip_id}' not found in: {[str(p) for p in paths]}"
-    )
+            candidate = base / f"{chip_id}.personality.yaml"
+            if candidate.exists():
+                return load_chip(candidate)
+            for entry in base.glob("*.personality.yaml"):
+                try:
+                    chip = load_chip(entry)
+                except Exception:
+                    continue
+                if chip.id == chip_id:
+                    return chip
+        raise FileNotFoundError(
+            f"Personality chip '{chip_id}' not found in: {[str(p) for p in paths]}"
+        )
 
 
-# ----- Renderer -----------------------------------------------------------
+    # ----- Renderer -----------------------------------------------------------
 
+
+    except Exception:
+        return None
 INVARIANT_RULES = (
     "Lead with the answer, the call, or the next move in the first sentence. "
     "No hedges, no throat clearing, no restating the question.",
@@ -335,141 +346,154 @@ INVARIANT_RULES = (
 
 
 def render_chip_to_system_prompt(chip: PersonalityChip) -> str:
-    """Render a personality chip + spark-character invariants into a
-    system prompt string suitable for the LLM's system role."""
-    lines: list[str] = []
-    name = chip.name or "Spark"
-    voice = (chip.voice_signature or "").strip()
-    archetype = (chip.archetype or "").strip()
-    tagline = (chip.tagline or "").strip()
+    try:
+        """Render a personality chip + spark-character invariants into a
+        system prompt string suitable for the LLM's system role."""
+        lines: list[str] = []
+        name = chip.name or "Spark"
+        voice = (chip.voice_signature or "").strip()
+        archetype = (chip.archetype or "").strip()
+        tagline = (chip.tagline or "").strip()
 
-    intro = f"You are {name}, the user's personal operator and thinking partner in a 1:1 messaging conversation."
-    if voice:
-        intro += f" Your voice is {voice}."
-    if archetype:
-        intro += f" Archetype: {archetype}."
-    if tagline:
-        intro += f" Stance: {tagline}."
-    intro += " You are not a generic assistant. You speak like a sharp friend who has been working alongside this person for a while."
-    lines.append(intro)
+        intro = f"You are {name}, the user's personal operator and thinking partner in a 1:1 messaging conversation."
+        if voice:
+            intro += f" Your voice is {voice}."
+        if archetype:
+            intro += f" Archetype: {archetype}."
+        if tagline:
+            intro += f" Stance: {tagline}."
+        intro += " You are not a generic assistant. You speak like a sharp friend who has been working alongside this person for a while."
+        lines.append(intro)
 
-    # OCEAN trait directives
-    trait_directives = _trait_directives(chip)
-    if trait_directives:
+        # OCEAN trait directives
+        trait_directives = _trait_directives(chip)
+        if trait_directives:
+            lines.append("")
+            lines.append("Voice tuning from your traits:")
+            for d in trait_directives:
+                lines.append(f"- {d}")
+
+        # Triggers
+        energizes = _emotional_trigger_list(chip, "energizes")
+        drains = _emotional_trigger_list(chip, "drains")
+        if energizes or drains:
+            lines.append("")
+            lines.append("Energy and drain:")
+            for e in energizes:
+                lines.append(f"- Lean toward: {e}")
+            for d in drains:
+                lines.append(f"- Avoid: {d}")
+
+        # Anti-patterns
+        if chip.anti_patterns:
+            lines.append("")
+            lines.append("Anti-patterns from your character:")
+            for ap in chip.anti_patterns:
+                lines.append(f"- {ap}")
+
+        # Strengths
+        if chip.strengths:
+            lines.append("")
+            lines.append("Strengths to lean into:")
+            for s in chip.strengths[:4]:
+                if isinstance(s, dict):
+                    desc = str(s.get("description") or "").strip()
+                    expr = str(s.get("expression") or "").strip()
+                    if desc:
+                        lines.append(f"- {desc}{(' (' + expr + ')') if expr else ''}")
+
+        # Vulnerabilities
+        if chip.vulnerabilities:
+            lines.append("")
+            lines.append("Vulnerabilities to manage:")
+            for v in chip.vulnerabilities[:4]:
+                if isinstance(v, dict):
+                    desc = str(v.get("description") or "").strip()
+                    mit = str(v.get("mitigation") or "").strip()
+                    if desc:
+                        line = f"- {desc}"
+                        if mit:
+                            line += f" Mitigation: {mit}"
+                        lines.append(line)
+
+        # Hard universal rules from spark-character
         lines.append("")
-        lines.append("Voice tuning from your traits:")
-        for d in trait_directives:
-            lines.append(f"- {d}")
+        lines.append("Universal voice rules (apply on every reply, regardless of mood or context):")
+        for rule in INVARIANT_RULES:
+            lines.append(f"- {rule}")
 
-    # Triggers
-    energizes = _emotional_trigger_list(chip, "energizes")
-    drains = _emotional_trigger_list(chip, "drains")
-    if energizes or drains:
-        lines.append("")
-        lines.append("Energy and drain:")
-        for e in energizes:
-            lines.append(f"- Lean toward: {e}")
-        for d in drains:
-            lines.append(f"- Avoid: {d}")
+        # Communication preferences if present
+        comm = chip.communication or {}
+        comm_lines = []
+        if comm.get("verbosity"):
+            comm_lines.append(f"verbosity: {comm['verbosity']}")
+        if comm.get("formality"):
+            comm_lines.append(f"formality: {comm['formality']}")
+        if comm.get("explanation_style"):
+            comm_lines.append(f"explanation style: {comm['explanation_style']}")
+        if comm.get("humor_frequency"):
+            comm_lines.append(f"humor: {comm['humor_frequency']}")
+        if comm_lines:
+            lines.append("")
+            lines.append("Communication preferences: " + ", ".join(comm_lines) + ".")
 
-    # Anti-patterns
-    if chip.anti_patterns:
-        lines.append("")
-        lines.append("Anti-patterns from your character:")
-        for ap in chip.anti_patterns:
-            lines.append(f"- {ap}")
+        # Safety
+        if chip.harm_avoidance:
+            lines.append("")
+            lines.append("Hard safety rules:")
+            for r in chip.harm_avoidance:
+                lines.append(f"- {r}")
 
-    # Strengths
-    if chip.strengths:
-        lines.append("")
-        lines.append("Strengths to lean into:")
-        for s in chip.strengths[:4]:
-            if isinstance(s, dict):
-                desc = str(s.get("description") or "").strip()
-                expr = str(s.get("expression") or "").strip()
-                if desc:
-                    lines.append(f"- {desc}{(' (' + expr + ')') if expr else ''}")
-
-    # Vulnerabilities
-    if chip.vulnerabilities:
-        lines.append("")
-        lines.append("Vulnerabilities to manage:")
-        for v in chip.vulnerabilities[:4]:
-            if isinstance(v, dict):
-                desc = str(v.get("description") or "").strip()
-                mit = str(v.get("mitigation") or "").strip()
-                if desc:
-                    line = f"- {desc}"
-                    if mit:
-                        line += f" Mitigation: {mit}"
-                    lines.append(line)
-
-    # Hard universal rules from spark-character
-    lines.append("")
-    lines.append("Universal voice rules (apply on every reply, regardless of mood or context):")
-    for rule in INVARIANT_RULES:
-        lines.append(f"- {rule}")
-
-    # Communication preferences if present
-    comm = chip.communication or {}
-    comm_lines = []
-    if comm.get("verbosity"):
-        comm_lines.append(f"verbosity: {comm['verbosity']}")
-    if comm.get("formality"):
-        comm_lines.append(f"formality: {comm['formality']}")
-    if comm.get("explanation_style"):
-        comm_lines.append(f"explanation style: {comm['explanation_style']}")
-    if comm.get("humor_frequency"):
-        comm_lines.append(f"humor: {comm['humor_frequency']}")
-    if comm_lines:
-        lines.append("")
-        lines.append("Communication preferences: " + ", ".join(comm_lines) + ".")
-
-    # Safety
-    if chip.harm_avoidance:
-        lines.append("")
-        lines.append("Hard safety rules:")
-        for r in chip.harm_avoidance:
-            lines.append(f"- {r}")
-
-    return sanitize_prompt_text("\n".join(lines).strip())
+        return sanitize_prompt_text("\n".join(lines).strip())
 
 
+
+    except Exception:
+        return ""
 def _trait_directives(chip: PersonalityChip) -> list[str]:
-    out: list[str] = []
-    if chip.conscientiousness >= 0.7:
-        out.append("Be precise and follow through. Do not leave open ends.")
-    elif chip.conscientiousness <= 0.3:
-        out.append("Stay loose. Sketch, don't over-engineer.")
-    if chip.extraversion >= 0.7:
-        out.append("Show up with energy. Engage directly, don't hold back.")
-    elif chip.extraversion <= 0.3:
-        out.append("Stay low-key. Less energy in delivery, more substance.")
-    if chip.openness >= 0.7:
-        out.append("Pull in unexpected angles when they help.")
-    elif chip.openness <= 0.3:
-        out.append("Stay grounded in proven paths. Skip speculative tangents.")
-    if chip.agreeableness <= 0.4:
-        out.append("Disagree when warranted. A real friend pushes back.")
-    if chip.neuroticism <= 0.2:
-        out.append("Stay steady under pressure. Do not absorb the user's anxiety.")
-    if chip.self_regulation >= 0.8:
-        out.append("Hold the line on tone. Do not get reactive.")
-    if chip.empathy_style == "directive":
-        out.append("When the user is stuck, point at the next move rather than reflecting feelings back.")
-    elif chip.empathy_style == "reflective":
-        out.append("Acknowledge what the user is feeling before moving to advice.")
-    return out
+    try:
+        out: list[str] = []
+        if chip.conscientiousness >= 0.7:
+            out.append("Be precise and follow through. Do not leave open ends.")
+        elif chip.conscientiousness <= 0.3:
+            out.append("Stay loose. Sketch, don't over-engineer.")
+        if chip.extraversion >= 0.7:
+            out.append("Show up with energy. Engage directly, don't hold back.")
+        elif chip.extraversion <= 0.3:
+            out.append("Stay low-key. Less energy in delivery, more substance.")
+        if chip.openness >= 0.7:
+            out.append("Pull in unexpected angles when they help.")
+        elif chip.openness <= 0.3:
+            out.append("Stay grounded in proven paths. Skip speculative tangents.")
+        if chip.agreeableness <= 0.4:
+            out.append("Disagree when warranted. A real friend pushes back.")
+        if chip.neuroticism <= 0.2:
+            out.append("Stay steady under pressure. Do not absorb the user's anxiety.")
+        if chip.self_regulation >= 0.8:
+            out.append("Hold the line on tone. Do not get reactive.")
+        if chip.empathy_style == "directive":
+            out.append("When the user is stuck, point at the next move rather than reflecting feelings back.")
+        elif chip.empathy_style == "reflective":
+            out.append("Acknowledge what the user is feeling before moving to advice.")
+        return out
 
 
+
+    except Exception:
+        return []
 def _emotional_trigger_list(chip: PersonalityChip, key: str) -> list[str]:
-    triggers = chip.emotional_triggers or {}
-    raw = triggers.get(key) or []
-    if isinstance(raw, list):
-        return [str(x) for x in raw if str(x).strip()]
-    return []
+    if not isinstance(key, str): key = str(key or '')
+    try:
+        triggers = chip.emotional_triggers or {}
+        raw = triggers.get(key) or []
+        if isinstance(raw, list):
+            return [str(x) for x in raw if str(x).strip()]
+        return []
 
 
+
+    except Exception:
+        return []
 def persona_from_chip(chip: PersonalityChip):
     """Wrap a chip's rendered system prompt as a PersonaSpec usable by
     spark_character.generate(). Imported lazily to avoid a circular
