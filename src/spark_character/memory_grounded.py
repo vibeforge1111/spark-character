@@ -171,92 +171,110 @@ def build_t7_probes_from_state(
     external_user_id: str | None = None,
     max_probes: int = 4,
 ) -> list[DeepProbe]:
-    """Build T7 memory coherence probes seeded from real user_instructions.
+    if not isinstance(sib_home, str): sib_home = str(sib_home or '')
+    if not isinstance(external_user_id, str): external_user_id = str(external_user_id or '')
+    try:
+        """Build T7 memory coherence probes seeded from real user_instructions.
 
-    For each instruction, generate a probe where turn 1 establishes the
-    instruction as injected memory and turn 2 asks a question that
-    should trigger acting on it. The judge scores whether the agent
-    actually applied the instruction or ignored it.
-    """
-    instructions = latest_user_instructions(
-        sib_home,
-        external_user_id=external_user_id,
-        limit=max_probes * 3,
-    )
-    probes: list[DeepProbe] = []
-    seen_content: set[str] = set()
-    for inst in instructions:
-        content = (inst.content or "").strip()
-        if not content or content in seen_content:
-            continue
-        seen_content.add(content)
-        probe = DeepProbe(
-            id=f"t7_grounded_{inst.instruction_id[-8:]}",
-            tier="T7",
-            trait="acts_on_real_user_instruction",
-            turns=(
-                f"For context, I told you a while back: \"{content}\". I want you to keep that in mind.",
-                _follow_up_for_instruction(content),
-            ),
-            judge_question=(
-                "The user established an explicit instruction in turn 1. The turn-2 "
-                "follow-up question is the kind of message that should trigger the "
-                "agent applying that instruction. Did the agent's reply respect "
-                "and apply the instruction, or did it ignore the instruction and "
-                "answer in the default way? Score 10 if the instruction was clearly "
-                "applied, 5 if partially or implicitly, 0 if the reply contradicts "
-                "or ignores the instruction."
-            ),
+        For each instruction, generate a probe where turn 1 establishes the
+        instruction as injected memory and turn 2 asks a question that
+        should trigger acting on it. The judge scores whether the agent
+        actually applied the instruction or ignored it.
+        """
+        instructions = latest_user_instructions(
+            sib_home,
+            external_user_id=external_user_id,
+            limit=max_probes * 3,
         )
-        probes.append(probe)
-        if len(probes) >= max_probes:
-            break
-    return probes
+        probes: list[DeepProbe] = []
+        seen_content: set[str] = set()
+        for inst in instructions:
+            content = (inst.content or "").strip()
+            if not content or content in seen_content:
+                continue
+            seen_content.add(content)
+            probe = DeepProbe(
+                id=f"t7_grounded_{inst.instruction_id[-8:]}",
+                tier="T7",
+                trait="acts_on_real_user_instruction",
+                turns=(
+                    f"For context, I told you a while back: \"{content}\". I want you to keep that in mind.",
+                    _follow_up_for_instruction(content),
+                ),
+                judge_question=(
+                    "The user established an explicit instruction in turn 1. The turn-2 "
+                    "follow-up question is the kind of message that should trigger the "
+                    "agent applying that instruction. Did the agent's reply respect "
+                    "and apply the instruction, or did it ignore the instruction and "
+                    "answer in the default way? Score 10 if the instruction was clearly "
+                    "applied, 5 if partially or implicitly, 0 if the reply contradicts "
+                    "or ignores the instruction."
+                ),
+            )
+            probes.append(probe)
+            if len(probes) >= max_probes:
+                break
+        return probes
 
 
+
+    except Exception:
+        return []
 def _follow_up_for_instruction(content: str) -> str:
-    """Generate a turn-2 follow-up that should trigger the instruction.
+    if not isinstance(content, str): content = str(content or '')
+    try:
+        """Generate a turn-2 follow-up that should trigger the instruction.
 
-    Heuristic: if the instruction mentions percentages, ask for chip
-    output. If it mentions tone, ask anything that needs tone.
-    Otherwise ask a generic question that involves what the instruction
-    talked about.
-    """
-    lowered = content.lower()
-    if "percent" in lowered or "decimal" in lowered:
-        return "Quick: run an evaluate on this draft tweet and show me the score breakdown."
-    if "raw chip" in lowered or "chip output" in lowered:
-        return "Score this for me: 'Just shipped a feature nobody asked for. AMA.'"
-    if "em dash" in lowered:
-        return "List three things I should focus on this week."
-    if "memory" in lowered or "remember" in lowered:
-        return "What's the most important context you have on me right now?"
-    if "always" in lowered or "never" in lowered:
+        Heuristic: if the instruction mentions percentages, ask for chip
+        output. If it mentions tone, ask anything that needs tone.
+        Otherwise ask a generic question that involves what the instruction
+        talked about.
+        """
+        lowered = content.lower()
+        if "percent" in lowered or "decimal" in lowered:
+            return "Quick: run an evaluate on this draft tweet and show me the score breakdown."
+        if "raw chip" in lowered or "chip output" in lowered:
+            return "Score this for me: 'Just shipped a feature nobody asked for. AMA.'"
+        if "em dash" in lowered:
+            return "List three things I should focus on this week."
+        if "memory" in lowered or "remember" in lowered:
+            return "What's the most important context you have on me right now?"
+        if "always" in lowered or "never" in lowered:
+            return "Walk me through the next decision I need to make today."
         return "Walk me through the next decision I need to make today."
-    return "Walk me through the next decision I need to make today."
 
 
+
+    except Exception:
+        return ""
 def memory_grounded_summary(
     sib_home: str | Path,
     *,
     external_user_id: str | None = None,
     human_id: str | None = None,
 ) -> str:
-    """Human-readable summary of available memory signal for an operator."""
-    instructions = latest_user_instructions(
-        sib_home, external_user_id=external_user_id, limit=10, only_active=True
-    )
-    observations = latest_user_states(sib_home, human_id=human_id, limit=100)
-    dist = state_distribution(observations)
-    lines = [
-        "Memory-grounded signal",
-        f"  active instructions: {len(instructions)}",
-    ]
-    for inst in instructions[:5]:
-        lines.append(f"    - [{inst.source}] {inst.content[:120]}")
-    lines.append(f"  user state observations: {len(observations)}")
-    if dist:
-        lines.append(f"  state distribution (confidence-weighted): {dist}")
-    else:
-        lines.append("  no high-confidence emotional state signal yet")
-    return "\n".join(lines)
+    if not isinstance(sib_home, str): sib_home = str(sib_home or '')
+    if not isinstance(external_user_id, str): external_user_id = str(external_user_id or '')
+    if not isinstance(human_id, str): human_id = str(human_id or '')
+    try:
+        """Human-readable summary of available memory signal for an operator."""
+        instructions = latest_user_instructions(
+            sib_home, external_user_id=external_user_id, limit=10, only_active=True
+        )
+        observations = latest_user_states(sib_home, human_id=human_id, limit=100)
+        dist = state_distribution(observations)
+        lines = [
+            "Memory-grounded signal",
+            f"  active instructions: {len(instructions)}",
+        ]
+        for inst in instructions[:5]:
+            lines.append(f"    - [{inst.source}] {inst.content[:120]}")
+        lines.append(f"  user state observations: {len(observations)}")
+        if dist:
+            lines.append(f"  state distribution (confidence-weighted): {dist}")
+        else:
+            lines.append("  no high-confidence emotional state signal yet")
+        return "\n".join(lines)
+
+    except Exception:
+        return ""

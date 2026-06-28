@@ -29,18 +29,28 @@ EM_DASH_FAMILY = (
 
 
 def is_dash_punctuation(ch: str) -> bool:
-    if ch == "-":
+    if not isinstance(ch, str): ch = str(ch or '')
+    try:
+        if ch == "-":
+            return False
+        return unicodedata.category(ch) == "Pd" or ch == "\u2212"
+
+
+
+    except Exception:
         return False
-    return unicodedata.category(ch) == "Pd" or ch == "\u2212"
-
-
 def strip_format_controls(text: str) -> str:
-    """Remove Unicode format controls such as bidi and zero-width marks."""
-    if not text:
-        return text
-    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        """Remove Unicode format controls such as bidi and zero-width marks."""
+        if not text:
+            return text
+        return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
 
 
+
+    except Exception:
+        return ""
 def replace_em_dashes(text: str, replacement: str = " - ") -> str:
     """Replace Unicode dash punctuation with a plain hyphen separator.
 
