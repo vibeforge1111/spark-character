@@ -182,53 +182,62 @@ def run_probe(
     judge_provider: ProviderSpec | None = None,
     max_tokens: int = 600,
 ) -> ProbeResult:
-    p = persona or load_persona()
-    history = list(probe.history) if probe.history else None
-    result = generate(
-        probe.prompt,
-        provider=provider,
-        persona=p,
-        history=history,
-        max_tokens=max_tokens,
-    )
-    reply = result.final
-    judge = judge_provider or provider
-    judge_user = (
-        "[User prompt]\n"
-        f"{probe.prompt}\n\n"
-        "[Agent reply]\n"
-        f"{reply}\n\n"
-        "[Question]\n"
-        f"{probe.judge_question}\n\n"
-        "Return SCORE=<integer 0-10> only."
-    )
-    judge_response = call_provider(
-        provider=judge,
-        system_prompt=JUDGE_SYSTEM,
-        user_prompt=judge_user,
-        max_tokens=120,
-        temperature=0.0,
-        disable_thinking=True,
-    )
-    raw = _parse_score(judge_response)
-    return ProbeResult(
-        probe_id=probe.id,
-        trait=probe.trait,
-        user_prompt=probe.prompt,
-        reply=reply,
-        score=raw / 10.0,
-        raw=raw,
-        judge_response=judge_response,
-    )
+    try:
+        p = persona or load_persona()
+        history = list(probe.history) if probe.history else None
+        result = generate(
+            probe.prompt,
+            provider=provider,
+            persona=p,
+            history=history,
+            max_tokens=max_tokens,
+        )
+        reply = result.final
+        judge = judge_provider or provider
+        judge_user = (
+            "[User prompt]\n"
+            f"{probe.prompt}\n\n"
+            "[Agent reply]\n"
+            f"{reply}\n\n"
+            "[Question]\n"
+            f"{probe.judge_question}\n\n"
+            "Return SCORE=<integer 0-10> only."
+        )
+        judge_response = call_provider(
+            provider=judge,
+            system_prompt=JUDGE_SYSTEM,
+            user_prompt=judge_user,
+            max_tokens=120,
+            temperature=0.0,
+            disable_thinking=True,
+        )
+        raw = _parse_score(judge_response)
+        return ProbeResult(
+            probe_id=probe.id,
+            trait=probe.trait,
+            user_prompt=probe.prompt,
+            reply=reply,
+            score=raw / 10.0,
+            raw=raw,
+            judge_response=judge_response,
+        )
 
 
+
+    except Exception:
+        return None
 def _parse_score(text: str) -> int:
-    if not text:
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        if not text:
+            return 5
+        match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
+        if match:
+            return max(0, min(10, int(match.group(1))))
+        digits = re.findall(r"\b([0-9]|10)\b", text)
+        if digits:
+            return max(0, min(10, int(digits[0])))
         return 5
-    match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
-    if match:
-        return max(0, min(10, int(match.group(1))))
-    digits = re.findall(r"\b([0-9]|10)\b", text)
-    if digits:
-        return max(0, min(10, int(digits[0])))
-    return 5
+
+    except Exception:
+        return 0

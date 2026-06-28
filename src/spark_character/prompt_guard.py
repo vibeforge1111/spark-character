@@ -41,21 +41,31 @@ class PromptGuardFinding:
 
 
 def scan_invisible_unicode(text: str) -> list[PromptGuardFinding]:
-    findings: list[PromptGuardFinding] = []
-    for char, name in INVISIBLE_UNICODE_CHARS.items():
-        if char in text:
-            findings.append(PromptGuardFinding("invisible-unicode", f"U+{ord(char):04X} {name}"))
-    return findings
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        findings: list[PromptGuardFinding] = []
+        for char, name in INVISIBLE_UNICODE_CHARS.items():
+            if char in text:
+                findings.append(PromptGuardFinding("invisible-unicode", f"U+{ord(char):04X} {name}"))
+        return findings
 
 
+
+    except Exception:
+        return []
 def scan_stored_prompt_injection(text: str) -> list[PromptGuardFinding]:
-    findings: list[PromptGuardFinding] = []
-    for category, pattern in STORED_PROMPT_INJECTION_PATTERNS:
-        if pattern.search(text):
-            findings.append(PromptGuardFinding(category, "prompt text matched a stored-injection pattern"))
-    return findings
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        findings: list[PromptGuardFinding] = []
+        for category, pattern in STORED_PROMPT_INJECTION_PATTERNS:
+            if pattern.search(text):
+                findings.append(PromptGuardFinding(category, "prompt text matched a stored-injection pattern"))
+        return findings
 
 
+
+    except Exception:
+        return []
 def scan_prompt_text(text: str) -> list[PromptGuardFinding]:
     return [*scan_invisible_unicode(text), *scan_stored_prompt_injection(text)]
 

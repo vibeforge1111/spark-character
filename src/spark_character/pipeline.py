@@ -215,16 +215,21 @@ async def generate_with_critique_async(
 
 
 def _accept_rewrite_or_keep(draft: str, result: CritiqueResult) -> str:
-    """Only accept a rewrite if it actually improves the persona score.
+    if not isinstance(draft, str): draft = str(draft or '')
+    try:
+        """Only accept a rewrite if it actually improves the persona score.
 
-    Defends against critic outputs that leak meta-commentary like
-    "Let me check the draft against the rules:" by comparing scores
-    and falling back to the draft when the rewrite scores worse.
-    """
-    if not result.rewritten:
+        Defends against critic outputs that leak meta-commentary like
+        "Let me check the draft against the rules:" by comparing scores
+        and falling back to the draft when the rewrite scores worse.
+        """
+        if not result.rewritten:
+            return draft
+        draft_score = score_persona(draft)
+        rewrite_score = score_persona(result.final)
+        if rewrite_score.mean >= draft_score.mean:
+            return result.final
         return draft
-    draft_score = score_persona(draft)
-    rewrite_score = score_persona(result.final)
-    if rewrite_score.mean >= draft_score.mean:
-        return result.final
-    return draft
+
+    except Exception:
+        return ""
