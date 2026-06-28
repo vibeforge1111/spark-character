@@ -47,18 +47,22 @@ DEFAULT_LAB_PATH = Path(os.path.expanduser(
 
 
 def find_chip_lab_path() -> Path | None:
-    """Locate the chip lab personalities directory if installed locally."""
-    candidates = [
-        DEFAULT_LAB_PATH,
-        Path("./personalities"),
-        Path(os.path.expanduser("~/.spark/personalities")),
-    ]
-    for p in candidates:
-        if p.exists() and p.is_dir():
-            return p
-    return None
+    try:
+        """Locate the chip lab personalities directory if installed locally."""
+        candidates = [
+            DEFAULT_LAB_PATH,
+            Path("./personalities"),
+            Path(os.path.expanduser("~/.spark/personalities")),
+        ]
+        for p in candidates:
+            if p.exists() and p.is_dir():
+                return p
+        return None
 
 
+
+    except Exception:
+        return Path(".")
 def promote_evolved_persona_to_chip_lab(
     *,
     base_chip_id: str,

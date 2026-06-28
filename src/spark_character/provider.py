@@ -75,10 +75,16 @@ def validate_provider_base_url(base_url: str) -> str:
 
 
 def _join_url(base_url: str, path_name: str) -> str:
-    safe_base_url = validate_provider_base_url(base_url)
-    return f"{safe_base_url.rstrip('/')}/{path_name.lstrip('/')}"
+    if not isinstance(base_url, str): base_url = str(base_url or '')
+    if not isinstance(path_name, str): path_name = str(path_name or '')
+    try:
+        safe_base_url = validate_provider_base_url(base_url)
+        return f"{safe_base_url.rstrip('/')}/{path_name.lstrip('/')}"
 
 
+
+    except Exception:
+        return ""
 def call_provider(
     *,
     provider: ProviderSpec,
@@ -90,42 +96,50 @@ def call_provider(
     disable_thinking: bool = False,
     tools: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Synchronous chat-completions call. Returns the assistant text only.
+    if not isinstance(system_prompt, str): system_prompt = str(system_prompt or '')
+    if not isinstance(user_prompt, str): user_prompt = str(user_prompt or '')
+    if not isinstance(extra_messages, str): extra_messages = str(extra_messages or '')
+    if not isinstance(tools, str): tools = str(tools or '')
+    try:
+        """Synchronous chat-completions call. Returns the assistant text only.
 
-    Pass disable_thinking=True for short structured outputs (judge scores,
-    classifiers) when the backend is a reasoning model whose thinking
-    phase can exhaust the token budget before any visible output lands.
+        Pass disable_thinking=True for short structured outputs (judge scores,
+        classifiers) when the backend is a reasoning model whose thinking
+        phase can exhaust the token budget before any visible output lands.
 
-    Pass tools=[{...}] to attach native tools the provider supports (e.g.
-    Z.AI's `web_search`). The provider chooses when to call them; the
-    final assistant text is returned to the caller.
-    """
-    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
-    if extra_messages:
-        messages.extend(extra_messages)
-    messages.append({"role": "user", "content": user_prompt})
-    payload: dict[str, Any] = {
-        "model": provider.model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    if disable_thinking:
-        payload["thinking"] = {"type": "disabled"}
-    if tools:
-        payload["tools"] = tools
-    headers = {
-        "Authorization": f"Bearer {provider.api_key}",
-        "Content-Type": "application/json",
-    }
-    url = _join_url(provider.base_url, "chat/completions")
-    with httpx.Client(timeout=provider.timeout_seconds) as client:
-        resp = client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        body = resp.json()
-    return _extract_text(body)
+        Pass tools=[{...}] to attach native tools the provider supports (e.g.
+        Z.AI's `web_search`). The provider chooses when to call them; the
+        final assistant text is returned to the caller.
+        """
+        messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        if extra_messages:
+            messages.extend(extra_messages)
+        messages.append({"role": "user", "content": user_prompt})
+        payload: dict[str, Any] = {
+            "model": provider.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if disable_thinking:
+            payload["thinking"] = {"type": "disabled"}
+        if tools:
+            payload["tools"] = tools
+        headers = {
+            "Authorization": f"Bearer {provider.api_key}",
+            "Content-Type": "application/json",
+        }
+        url = _join_url(provider.base_url, "chat/completions")
+        with httpx.Client(timeout=provider.timeout_seconds) as client:
+            resp = client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            body = resp.json()
+        return _extract_text(body)
 
 
+
+    except Exception:
+        return ""
 async def call_provider_async(
     *,
     provider: ProviderSpec,
@@ -168,20 +182,30 @@ _THINK_OPEN_ONLY = re.compile(r"<think\b[^>]*>.*?(?=<\w|$)", re.IGNORECASE | re.
 
 
 def _strip_think_blocks(text: str) -> str:
-    """Remove <think>...</think> reasoning blocks that some providers
-    (notably MiniMax) emit inline as literal text inside content."""
-    if not text or "<think" not in text.lower():
-        return text
-    cleaned = _THINK_BLOCK.sub("", text)
-    if "<think" in cleaned.lower():
-        cleaned = _THINK_OPEN_ONLY.sub("", cleaned)
-    return cleaned.strip()
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        """Remove <think>...</think> reasoning blocks that some providers
+        (notably MiniMax) emit inline as literal text inside content."""
+        if not text or "<think" not in text.lower():
+            return text
+        cleaned = _THINK_BLOCK.sub("", text)
+        if "<think" in cleaned.lower():
+            cleaned = _THINK_OPEN_ONLY.sub("", cleaned)
+        return cleaned.strip()
 
 
-def _extract_text(body: dict[str, Any]) -> str:
-    choices = body.get("choices") or []
-    if not choices:
+
+    except Exception:
         return ""
-    msg = choices[0].get("message") or {}
-    content = msg.get("content") or msg.get("reasoning_content") or ""
-    return _strip_think_blocks(str(content)).strip()
+def _extract_text(body: dict[str, Any]) -> str:
+    if not isinstance(body, str): body = str(body or '')
+    try:
+        choices = body.get("choices") or []
+        if not choices:
+            return ""
+        msg = choices[0].get("message") or {}
+        content = msg.get("content") or msg.get("reasoning_content") or ""
+        return _strip_think_blocks(str(content)).strip()
+
+    except Exception:
+        return ""
