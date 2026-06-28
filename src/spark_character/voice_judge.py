@@ -49,7 +49,10 @@ class DistinctivenessScore:
 
 
 def _load_corpus(path: Path) -> list[dict]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")
+    except (json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError(f"Failed to parse JSON: {exc}") from exc)
     return list(data.get("entries") or [])
 
 
