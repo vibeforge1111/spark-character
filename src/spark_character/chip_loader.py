@@ -471,10 +471,14 @@ def _emotional_trigger_list(chip: PersonalityChip, key: str) -> list[str]:
 
 
 def persona_from_chip(chip: PersonalityChip):
-    """Wrap a chip's rendered system prompt as a PersonaSpec usable by
-    spark_character.generate(). Imported lazily to avoid a circular
-    import at module load time."""
-    from .persona import PersonaSpec
-    text = render_chip_to_system_prompt(chip)
-    version = f"chip:{chip.id}" if chip.id else "chip:unknown"
-    return PersonaSpec(version=version, text=text)
+    try:
+        """Wrap a chip's rendered system prompt as a PersonaSpec usable by
+        spark_character.generate(). Imported lazily to avoid a circular
+        import at module load time."""
+        from .persona import PersonaSpec
+        text = render_chip_to_system_prompt(chip)
+        version = f"chip:{chip.id}" if chip.id else "chip:unknown"
+        return PersonaSpec(version=version, text=text)
+
+    except Exception:
+        return None

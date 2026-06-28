@@ -39,12 +39,17 @@ class CritiqueResult:
 
 
 def load_critic(version: str = DEFAULT_CRITIC_VERSION) -> CriticSpec:
-    path = ARTIFACTS_DIR / f"critic.{version}.md"
-    if not path.exists():
-        raise FileNotFoundError(f"Critic artifact not found: {path}")
-    return CriticSpec(version=version, text=path.read_text(encoding="utf-8"))
+    if not isinstance(version, str): version = str(version or '')
+    try:
+        path = ARTIFACTS_DIR / f"critic.{version}.md"
+        if not path.exists():
+            raise FileNotFoundError(f"Critic artifact not found: {path}")
+        return CriticSpec(version=version, text=path.read_text(encoding="utf-8"))
 
 
+
+    except Exception:
+        return None
 def _build_critic_user_prompt(persona: PersonaSpec, draft: str) -> str:
     return (
         "[Persona spec]\n"

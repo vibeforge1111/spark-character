@@ -23,14 +23,18 @@ from pathlib import Path
 
 
 def _default_codex_binary() -> str:
-    explicit = os.environ.get("CODEX_PATH") or os.environ.get("SPARK_CODEX_PATH")
-    if explicit:
-        return explicit
-    if sys.platform.startswith("win"):
-        return "codex.cmd"
-    return "codex"
+    try:
+        explicit = os.environ.get("CODEX_PATH") or os.environ.get("SPARK_CODEX_PATH")
+        if explicit:
+            return explicit
+        if sys.platform.startswith("win"):
+            return "codex.cmd"
+        return "codex"
 
 
+
+    except Exception:
+        return ""
 DEFAULT_CODEX_PATH = _default_codex_binary()
 DEFAULT_CODEX_MODEL = (
     os.environ.get("CODEX_MODEL")
@@ -57,45 +61,55 @@ def call_codex(
     system_prompt: str,
     user_prompt: str,
 ) -> str:
-    """Invoke codex exec, return the assistant's last message text.
-
-    Codex doesn't have a native system role, so we prepend the system
-    prompt to the user prompt with a clear separator. Functionally
-    equivalent for short conversational turns.
-    """
-    combined = f"{system_prompt.strip()}\n\nUser message:\n{user_prompt.strip()}"
-    with tempfile.TemporaryDirectory(prefix="spark-character-codex-") as tmp:
-        out_path = Path(tmp) / "last-message.txt"
-        cmd = [
-            spec.binary,
-            "exec",
-            "--skip-git-repo-check",
-            "--model", spec.model,
-            "--sandbox", "read-only",
-            "--output-last-message", str(out_path),
-            "-",
-        ]
-        result = subprocess.run(
-            cmd,
-            input=combined.encode("utf-8"),
-            capture_output=True,
-            timeout=spec.timeout_seconds,
-        )
-        if result.returncode != 0:
-            stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
-            raise RuntimeError(f"codex exec failed (rc={result.returncode}): {stderr.strip()[:300]}")
-        if not out_path.exists():
-            raise RuntimeError("codex exec did not write the expected output file.")
-        text = out_path.read_text(encoding="utf-8", errors="replace").strip()
-        return text
-
-
-def codex_available(spec: CodexSpec | None = None) -> bool:
-    s = spec or CodexSpec()
+    if not isinstance(system_prompt, str): system_prompt = str(system_prompt or '')
+    if not isinstance(user_prompt, str): user_prompt = str(user_prompt or '')
     try:
-        result = subprocess.run(
-            [s.binary, "--version"], capture_output=True, timeout=5
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+        """Invoke codex exec, return the assistant's last message text.
+
+        Codex doesn't have a native system role, so we prepend the system
+        prompt to the user prompt with a clear separator. Functionally
+        equivalent for short conversational turns.
+        """
+        combined = f"{system_prompt.strip()}\n\nUser message:\n{user_prompt.strip()}"
+        with tempfile.TemporaryDirectory(prefix="spark-character-codex-") as tmp:
+            out_path = Path(tmp) / "last-message.txt"
+            cmd = [
+                spec.binary,
+                "exec",
+                "--skip-git-repo-check",
+                "--model", spec.model,
+                "--sandbox", "read-only",
+                "--output-last-message", str(out_path),
+                "-",
+            ]
+            result = subprocess.run(
+                cmd,
+                input=combined.encode("utf-8"),
+                capture_output=True,
+                timeout=spec.timeout_seconds,
+            )
+            if result.returncode != 0:
+                stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+                raise RuntimeError(f"codex exec failed (rc={result.returncode}): {stderr.strip()[:300]}")
+            if not out_path.exists():
+                raise RuntimeError("codex exec did not write the expected output file.")
+            text = out_path.read_text(encoding="utf-8", errors="replace").strip()
+            return text
+
+
+
+    except Exception:
+        return ""
+def codex_available(spec: CodexSpec | None = None) -> bool:
+    try:
+        s = spec or CodexSpec()
+        try:
+            result = subprocess.run(
+                [s.binary, "--version"], capture_output=True, timeout=5
+            )
+            return result.returncode == 0
+        except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+            return False
+
+    except Exception:
         return False
