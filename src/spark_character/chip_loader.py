@@ -118,150 +118,173 @@ TOP_LEVEL_DICT_FIELDS = (
 
 
 def _require_mapping(value: Any, field_name: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"Personality chip field {field_name} must be a mapping.")
-    return value
-
-
-def _validate_score(value: Any, field_name: str) -> None:
-    if isinstance(value, bool):
-        raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].")
+    if not isinstance(field_name, str): field_name = str(field_name or '')
     try:
-        number = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].") from exc
-    if not math.isfinite(number) or number < 0.0 or number > 1.0:
-        raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].")
+        if not isinstance(value, dict):
+            raise ValueError(f"Personality chip field {field_name} must be a mapping.")
+        return value
 
 
+
+    except Exception:
+        return {}
+def _validate_score(value: Any, field_name: str) -> None:
+    if not isinstance(field_name, str): field_name = str(field_name or '')
+    try:
+        if isinstance(value, bool):
+            raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].")
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].") from exc
+        if not math.isfinite(number) or number < 0.0 or number > 1.0:
+            raise ValueError(f"Personality chip field {field_name} must be a number in [0, 1].")
+
+
+
+    except Exception:
+        return None
 def validate_chip_yaml_spec(spec: Any) -> dict[str, Any]:
-    """Validate the minimal chip-lab YAML shape consumed by spark-character."""
-    root = _require_mapping(spec, "<root>")
-    schema = root.get("schema", "spark-personality-chip.v1")
-    if not isinstance(schema, str) or not schema.strip():
-        raise ValueError("Personality chip field schema must be a non-empty string.")
+    try:
+        """Validate the minimal chip-lab YAML shape consumed by spark-character."""
+        root = _require_mapping(spec, "<root>")
+        schema = root.get("schema", "spark-personality-chip.v1")
+        if not isinstance(schema, str) or not schema.strip():
+            raise ValueError("Personality chip field schema must be a non-empty string.")
 
-    identity = _require_mapping(root.get("identity"), "identity")
-    for key in ("id", "name"):
-        if not isinstance(identity.get(key), str) or not identity.get(key, "").strip():
-            raise ValueError(f"Personality chip field identity.{key} must be a non-empty string.")
-    for key in ("archetype", "voice_signature", "tagline"):
-        if key in identity and identity[key] is not None and not isinstance(identity[key], str):
-            raise ValueError(f"Personality chip field identity.{key} must be a string.")
+        identity = _require_mapping(root.get("identity"), "identity")
+        for key in ("id", "name"):
+            if not isinstance(identity.get(key), str) or not identity.get(key, "").strip():
+                raise ValueError(f"Personality chip field identity.{key} must be a non-empty string.")
+        for key in ("archetype", "voice_signature", "tagline"):
+            if key in identity and identity[key] is not None and not isinstance(identity[key], str):
+                raise ValueError(f"Personality chip field identity.{key} must be a string.")
 
-    traits = _require_mapping(root.get("traits", {}), "traits")
-    for key in TRAIT_FIELDS:
-        if key in traits:
-            _validate_score(traits[key], f"traits.{key}")
+        traits = _require_mapping(root.get("traits", {}), "traits")
+        for key in TRAIT_FIELDS:
+            if key in traits:
+                _validate_score(traits[key], f"traits.{key}")
 
-    emotional_profile = _require_mapping(root.get("emotional_profile", {}), "emotional_profile")
-    for key in EMOTIONAL_PROFILE_SCORE_FIELDS:
-        if key in emotional_profile:
-            _validate_score(emotional_profile[key], f"emotional_profile.{key}")
-    if "empathy_style" in emotional_profile and not isinstance(emotional_profile["empathy_style"], str):
-        raise ValueError("Personality chip field emotional_profile.empathy_style must be a string.")
-    emotional_range = _require_mapping(emotional_profile.get("emotional_range", {}), "emotional_profile.emotional_range")
-    for key, value in emotional_range.items():
-        _validate_score(value, f"emotional_profile.emotional_range.{key}")
-    triggers = _require_mapping(emotional_profile.get("triggers", {}), "emotional_profile.triggers")
-    for key, value in triggers.items():
-        if not isinstance(value, list):
-            raise ValueError(f"Personality chip field emotional_profile.triggers.{key} must be a list.")
+        emotional_profile = _require_mapping(root.get("emotional_profile", {}), "emotional_profile")
+        for key in EMOTIONAL_PROFILE_SCORE_FIELDS:
+            if key in emotional_profile:
+                _validate_score(emotional_profile[key], f"emotional_profile.{key}")
+        if "empathy_style" in emotional_profile and not isinstance(emotional_profile["empathy_style"], str):
+            raise ValueError("Personality chip field emotional_profile.empathy_style must be a string.")
+        emotional_range = _require_mapping(emotional_profile.get("emotional_range", {}), "emotional_profile.emotional_range")
+        for key, value in emotional_range.items():
+            _validate_score(value, f"emotional_profile.emotional_range.{key}")
+        triggers = _require_mapping(emotional_profile.get("triggers", {}), "emotional_profile.triggers")
+        for key, value in triggers.items():
+            if not isinstance(value, list):
+                raise ValueError(f"Personality chip field emotional_profile.triggers.{key} must be a list.")
 
-    preferences = _require_mapping(root.get("preferences", {}), "preferences")
-    for key in ("likes", "dislikes"):
-        if key in preferences and not isinstance(preferences[key], list):
-            raise ValueError(f"Personality chip field preferences.{key} must be a list.")
-    for key in ("communication", "decision_making"):
-        if key in preferences and not isinstance(preferences[key], dict):
-            raise ValueError(f"Personality chip field preferences.{key} must be a mapping.")
+        preferences = _require_mapping(root.get("preferences", {}), "preferences")
+        for key in ("likes", "dislikes"):
+            if key in preferences and not isinstance(preferences[key], list):
+                raise ValueError(f"Personality chip field preferences.{key} must be a list.")
+        for key in ("communication", "decision_making"):
+            if key in preferences and not isinstance(preferences[key], dict):
+                raise ValueError(f"Personality chip field preferences.{key} must be a mapping.")
 
-    safety = _require_mapping(root.get("safety", {}), "safety")
-    if "harm_avoidance" in safety and not isinstance(safety["harm_avoidance"], list):
-        raise ValueError("Personality chip field safety.harm_avoidance must be a list.")
+        safety = _require_mapping(root.get("safety", {}), "safety")
+        if "harm_avoidance" in safety and not isinstance(safety["harm_avoidance"], list):
+            raise ValueError("Personality chip field safety.harm_avoidance must be a list.")
 
-    for key in TOP_LEVEL_LIST_FIELDS:
-        if key in root and not isinstance(root[key], list):
-            raise ValueError(f"Personality chip field {key} must be a list.")
-    for key in TOP_LEVEL_DICT_FIELDS:
-        if key in root and not isinstance(root[key], dict):
-            raise ValueError(f"Personality chip field {key} must be a mapping.")
-    return root
+        for key in TOP_LEVEL_LIST_FIELDS:
+            if key in root and not isinstance(root[key], list):
+                raise ValueError(f"Personality chip field {key} must be a list.")
+        for key in TOP_LEVEL_DICT_FIELDS:
+            if key in root and not isinstance(root[key], dict):
+                raise ValueError(f"Personality chip field {key} must be a mapping.")
+        return root
 
 
+
+    except Exception:
+        return {}
 def _coerce_lab_chip(lab_chip: Any) -> PersonalityChip:
-    """Convert a personality_engine.PersonalityChip into our local
-    dataclass so callers always see one shape."""
-    return PersonalityChip(
-        id=lab_chip.id,
-        name=lab_chip.name,
-        archetype=getattr(lab_chip, "archetype", "builder"),
-        voice_signature=getattr(lab_chip, "voice_signature", ""),
-        tagline=getattr(lab_chip, "tagline", ""),
-        openness=float(getattr(lab_chip, "openness", 0.5)),
-        conscientiousness=float(getattr(lab_chip, "conscientiousness", 0.5)),
-        extraversion=float(getattr(lab_chip, "extraversion", 0.5)),
-        agreeableness=float(getattr(lab_chip, "agreeableness", 0.5)),
-        neuroticism=float(getattr(lab_chip, "neuroticism", 0.5)),
-        self_awareness=float(getattr(lab_chip, "self_awareness", 0.5)),
-        self_regulation=float(getattr(lab_chip, "self_regulation", 0.5)),
-        social_awareness=float(getattr(lab_chip, "social_awareness", 0.5)),
-        empathy_style=getattr(lab_chip, "empathy_style", "reflective"),
-        emotional_range=dict(getattr(lab_chip, "emotional_range", {})),
-        emotional_triggers=dict(getattr(lab_chip, "emotional_triggers", {})),
-        vulnerabilities=list(getattr(lab_chip, "vulnerabilities", [])),
-        strengths=list(getattr(lab_chip, "strengths", [])),
-        likes=list(getattr(lab_chip, "likes", [])),
-        dislikes=list(getattr(lab_chip, "dislikes", [])),
-        communication=dict(getattr(lab_chip, "communication", {})),
-        decision_making=dict(getattr(lab_chip, "decision_making", {})),
-        anti_patterns=list(getattr(lab_chip, "anti_patterns", [])),
-        adaptive=dict(getattr(lab_chip, "adaptive", {})),
-        harm_avoidance=list(getattr(lab_chip, "harm_avoidance", [])),
-        _raw=dict(getattr(lab_chip, "_raw", {})),
-    )
+    try:
+        """Convert a personality_engine.PersonalityChip into our local
+        dataclass so callers always see one shape."""
+        return PersonalityChip(
+            id=lab_chip.id,
+            name=lab_chip.name,
+            archetype=getattr(lab_chip, "archetype", "builder"),
+            voice_signature=getattr(lab_chip, "voice_signature", ""),
+            tagline=getattr(lab_chip, "tagline", ""),
+            openness=float(getattr(lab_chip, "openness", 0.5)),
+            conscientiousness=float(getattr(lab_chip, "conscientiousness", 0.5)),
+            extraversion=float(getattr(lab_chip, "extraversion", 0.5)),
+            agreeableness=float(getattr(lab_chip, "agreeableness", 0.5)),
+            neuroticism=float(getattr(lab_chip, "neuroticism", 0.5)),
+            self_awareness=float(getattr(lab_chip, "self_awareness", 0.5)),
+            self_regulation=float(getattr(lab_chip, "self_regulation", 0.5)),
+            social_awareness=float(getattr(lab_chip, "social_awareness", 0.5)),
+            empathy_style=getattr(lab_chip, "empathy_style", "reflective"),
+            emotional_range=dict(getattr(lab_chip, "emotional_range", {})),
+            emotional_triggers=dict(getattr(lab_chip, "emotional_triggers", {})),
+            vulnerabilities=list(getattr(lab_chip, "vulnerabilities", [])),
+            strengths=list(getattr(lab_chip, "strengths", [])),
+            likes=list(getattr(lab_chip, "likes", [])),
+            dislikes=list(getattr(lab_chip, "dislikes", [])),
+            communication=dict(getattr(lab_chip, "communication", {})),
+            decision_making=dict(getattr(lab_chip, "decision_making", {})),
+            anti_patterns=list(getattr(lab_chip, "anti_patterns", [])),
+            adaptive=dict(getattr(lab_chip, "adaptive", {})),
+            harm_avoidance=list(getattr(lab_chip, "harm_avoidance", [])),
+            _raw=dict(getattr(lab_chip, "_raw", {})),
+        )
 
 
+
+    except Exception:
+        return None
 def _coerce_yaml_dict(spec: dict) -> PersonalityChip:
-    """Build PersonalityChip from a raw yaml-loaded dict using the
-    chip lab's nesting conventions: identity.*, traits.*, emotional_profile.*,
-    preferences.*, etc."""
-    spec = validate_chip_yaml_spec(spec)
-    identity = spec.get("identity") or {}
-    traits = spec.get("traits") or {}
-    emo = spec.get("emotional_profile") or {}
-    prefs = spec.get("preferences") or {}
-    safety = spec.get("safety") or {}
-    return PersonalityChip(
-        id=str(identity.get("id") or ""),
-        name=str(identity.get("name") or ""),
-        archetype=str(identity.get("archetype") or "builder"),
-        voice_signature=str(identity.get("voice_signature") or ""),
-        tagline=str(identity.get("tagline") or ""),
-        openness=float(traits.get("openness", 0.5)),
-        conscientiousness=float(traits.get("conscientiousness", 0.5)),
-        extraversion=float(traits.get("extraversion", 0.5)),
-        agreeableness=float(traits.get("agreeableness", 0.5)),
-        neuroticism=float(traits.get("neuroticism", 0.5)),
-        self_awareness=float(emo.get("self_awareness", 0.5)),
-        self_regulation=float(emo.get("self_regulation", 0.5)),
-        social_awareness=float(emo.get("social_awareness", 0.5)),
-        empathy_style=str(emo.get("empathy_style") or "reflective"),
-        emotional_range=dict(emo.get("emotional_range") or {}),
-        emotional_triggers=dict(emo.get("triggers") or {}),
-        vulnerabilities=list(spec.get("vulnerabilities") or []),
-        strengths=list(spec.get("strengths") or []),
-        likes=list(prefs.get("likes") or []),
-        dislikes=list(prefs.get("dislikes") or []),
-        communication=dict(prefs.get("communication") or {}),
-        decision_making=dict(prefs.get("decision_making") or {}),
-        anti_patterns=list(spec.get("anti_patterns") or []),
-        adaptive=dict(spec.get("adaptive") or {}),
-        harm_avoidance=list(safety.get("harm_avoidance") or []),
-        _raw=dict(spec),
-    )
+    if not isinstance(spec, dict): spec = dict(spec or {})
+    try:
+        """Build PersonalityChip from a raw yaml-loaded dict using the
+        chip lab's nesting conventions: identity.*, traits.*, emotional_profile.*,
+        preferences.*, etc."""
+        spec = validate_chip_yaml_spec(spec)
+        identity = spec.get("identity") or {}
+        traits = spec.get("traits") or {}
+        emo = spec.get("emotional_profile") or {}
+        prefs = spec.get("preferences") or {}
+        safety = spec.get("safety") or {}
+        return PersonalityChip(
+            id=str(identity.get("id") or ""),
+            name=str(identity.get("name") or ""),
+            archetype=str(identity.get("archetype") or "builder"),
+            voice_signature=str(identity.get("voice_signature") or ""),
+            tagline=str(identity.get("tagline") or ""),
+            openness=float(traits.get("openness", 0.5)),
+            conscientiousness=float(traits.get("conscientiousness", 0.5)),
+            extraversion=float(traits.get("extraversion", 0.5)),
+            agreeableness=float(traits.get("agreeableness", 0.5)),
+            neuroticism=float(traits.get("neuroticism", 0.5)),
+            self_awareness=float(emo.get("self_awareness", 0.5)),
+            self_regulation=float(emo.get("self_regulation", 0.5)),
+            social_awareness=float(emo.get("social_awareness", 0.5)),
+            empathy_style=str(emo.get("empathy_style") or "reflective"),
+            emotional_range=dict(emo.get("emotional_range") or {}),
+            emotional_triggers=dict(emo.get("triggers") or {}),
+            vulnerabilities=list(spec.get("vulnerabilities") or []),
+            strengths=list(spec.get("strengths") or []),
+            likes=list(prefs.get("likes") or []),
+            dislikes=list(prefs.get("dislikes") or []),
+            communication=dict(prefs.get("communication") or {}),
+            decision_making=dict(prefs.get("decision_making") or {}),
+            anti_patterns=list(spec.get("anti_patterns") or []),
+            adaptive=dict(spec.get("adaptive") or {}),
+            harm_avoidance=list(safety.get("harm_avoidance") or []),
+            _raw=dict(spec),
+        )
 
 
+
+    except Exception:
+        return None
 def load_chip(path: str | Path) -> PersonalityChip:
     """Load a personality chip from a yaml file.
 
