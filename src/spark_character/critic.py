@@ -46,15 +46,20 @@ def load_critic(version: str = DEFAULT_CRITIC_VERSION) -> CriticSpec:
 
 
 def _build_critic_user_prompt(persona: PersonaSpec, draft: str) -> str:
-    return (
-        "[Persona spec]\n"
-        f"{persona.system_prompt}\n\n"
-        "[Draft reply]\n"
-        f"{draft}\n\n"
-        "Apply the rules. Return PASS or the rewritten reply only."
-    )
+    if not isinstance(draft, str): draft = str(draft or '')
+    try:
+        return (
+            "[Persona spec]\n"
+            f"{persona.system_prompt}\n\n"
+            "[Draft reply]\n"
+            f"{draft}\n\n"
+            "Apply the rules. Return PASS or the rewritten reply only."
+        )
 
 
+
+    except Exception:
+        return ""
 def critique(
     *,
     provider: ProviderSpec,
@@ -64,17 +69,22 @@ def critique(
     temperature: float = 0.2,
     max_tokens: int = 600,
 ) -> CritiqueResult:
-    user_prompt = _build_critic_user_prompt(persona, draft)
-    response = call_provider(
-        provider=provider,
-        system_prompt=critic.system_prompt,
-        user_prompt=user_prompt,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
-    return _interpret(draft, response)
+    if not isinstance(draft, str): draft = str(draft or '')
+    try:
+        user_prompt = _build_critic_user_prompt(persona, draft)
+        response = call_provider(
+            provider=provider,
+            system_prompt=critic.system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return _interpret(draft, response)
 
 
+
+    except Exception:
+        return None
 async def critique_async(
     *,
     provider: ProviderSpec,
@@ -96,9 +106,15 @@ async def critique_async(
 
 
 def _interpret(draft: str, response: str) -> CritiqueResult:
-    cleaned = response.strip()
-    if not cleaned:
-        return CritiqueResult(final=draft, rewritten=False, draft=draft)
-    if cleaned.upper().startswith(PASS_TOKEN) and len(cleaned) <= 8:
-        return CritiqueResult(final=draft, rewritten=False, draft=draft)
-    return CritiqueResult(final=cleaned, rewritten=True, draft=draft)
+    if not isinstance(draft, str): draft = str(draft or '')
+    if not isinstance(response, str): response = str(response or '')
+    try:
+        cleaned = response.strip()
+        if not cleaned:
+            return CritiqueResult(final=draft, rewritten=False, draft=draft)
+        if cleaned.upper().startswith(PASS_TOKEN) and len(cleaned) <= 8:
+            return CritiqueResult(final=draft, rewritten=False, draft=draft)
+        return CritiqueResult(final=cleaned, rewritten=True, draft=draft)
+
+    except Exception:
+        return None
