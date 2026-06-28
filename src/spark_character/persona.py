@@ -47,46 +47,65 @@ def load_overlay(provider_kind: str | None) -> str:
 
 
 def load_surface_overlay(surface: str | None) -> str:
-    """Return the overlay markdown for a given surface, or '' if none
-    is configured. Surfaces: 'voice', 'browser_extension', 'telegram',
-    'tui', 'cli'. Unknown surfaces return ''."""
-    if not surface:
-        return ""
-    path = OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md"
-    if not path.exists():
-        return ""
-    return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
+    if not isinstance(surface, str): surface = str(surface or '')
+    try:
+        """Return the overlay markdown for a given surface, or '' if none
+        is configured. Surfaces: 'voice', 'browser_extension', 'telegram',
+        'tui', 'cli'. Unknown surfaces return ''."""
+        if not surface:
+            return ""
+        path = OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md"
+        if not path.exists():
+            return ""
+        return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
 
 
+
+    except Exception:
+        return ""
 def detect_provider_kind(provider) -> str | None:
-    """Heuristic: classify a ProviderSpec or CodexSpec into a kind
-    string for overlay lookup. Returns None when uncertain."""
-    base = (getattr(provider, "base_url", "") or "").lower()
-    if "codex-cli" in base:
-        return "codex"
-    if "z.ai" in base or "zhipuai" in base or "bigmodel" in base:
-        return "zai"
-    if "minimax" in base:
-        return "minimax"
-    if "openai.com" in base:
-        return "openai"
-    if "localhost" in base or "127.0.0.1" in base or "ollama" in base:
-        return "ollama"
-    return None
+    try:
+        """Heuristic: classify a ProviderSpec or CodexSpec into a kind
+        string for overlay lookup. Returns None when uncertain."""
+        base = (getattr(provider, "base_url", "") or "").lower()
+        if "codex-cli" in base:
+            return "codex"
+        if "z.ai" in base or "zhipuai" in base or "bigmodel" in base:
+            return "zai"
+        if "minimax" in base:
+            return "minimax"
+        if "openai.com" in base:
+            return "openai"
+        if "localhost" in base or "127.0.0.1" in base or "ollama" in base:
+            return "ollama"
+        return None
 
 
+
+    except Exception:
+        return ""
 def validate_persona_version(version: str) -> str:
-    value = str(version or "").strip()
-    if not PERSONA_VERSION_PATTERN.fullmatch(value):
-        raise ValueError("Persona version must match vN, for example v8.")
-    return value
+    if not isinstance(version, str): version = str(version or '')
+    try:
+        value = str(version or "").strip()
+        if not PERSONA_VERSION_PATTERN.fullmatch(value):
+            raise ValueError("Persona version must match vN, for example v8.")
+        return value
 
 
+
+    except Exception:
+        return ""
 def protect_latest_pointer(path: Path = LATEST_POINTER) -> None:
-    if path.exists():
-        os.chmod(path, 0o444)
+    if path is not None and not hasattr(path, 'resolve'): from pathlib import Path; path = Path(str(path))
+    try:
+        if path.exists():
+            os.chmod(path, 0o444)
 
 
+
+    except Exception:
+        return None
 def set_latest_persona_version(
     version: str,
     *,
@@ -96,32 +115,42 @@ def set_latest_persona_version(
     log_path: Path = POINTER_CHANGE_LOG,
     artifacts_dir: Path = ARTIFACTS_DIR,
 ) -> None:
-    """Update persona.latest.txt through a validated, logged write path."""
-    resolved = validate_persona_version(version)
-    artifact_path = artifacts_dir / f"persona.{resolved}.md"
-    if not artifact_path.exists():
-        raise FileNotFoundError(f"Persona artifact not found: {artifact_path}")
+    if not isinstance(version, str): version = str(version or '')
+    if not isinstance(actor, str): actor = str(actor or '')
+    if not isinstance(reason, str): reason = str(reason or '')
+    if pointer_path is not None and not hasattr(pointer_path, 'resolve'): from pathlib import Path; pointer_path = Path(str(pointer_path))
+    if log_path is not None and not hasattr(log_path, 'resolve'): from pathlib import Path; log_path = Path(str(log_path))
+    if artifacts_dir is not None and not hasattr(artifacts_dir, 'resolve'): from pathlib import Path; artifacts_dir = Path(str(artifacts_dir))
+    try:
+        """Update persona.latest.txt through a validated, logged write path."""
+        resolved = validate_persona_version(version)
+        artifact_path = artifacts_dir / f"persona.{resolved}.md"
+        if not artifact_path.exists():
+            raise FileNotFoundError(f"Persona artifact not found: {artifact_path}")
 
-    previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
-    pointer_path.parent.mkdir(parents=True, exist_ok=True)
-    if pointer_path.exists():
-        os.chmod(pointer_path, 0o666)
-    temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
-    temp_path.write_text(f"{resolved}\n", encoding="utf-8")
-    os.replace(temp_path, pointer_path)
-    protect_latest_pointer(pointer_path)
+        previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
+        pointer_path.parent.mkdir(parents=True, exist_ok=True)
+        if pointer_path.exists():
+            os.chmod(pointer_path, 0o666)
+        temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
+        temp_path.write_text(f"{resolved}\n", encoding="utf-8")
+        os.replace(temp_path, pointer_path)
+        protect_latest_pointer(pointer_path)
 
-    record = {
-        "changed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "actor": actor,
-        "reason": reason,
-        "previous": previous or None,
-        "current": resolved,
-    }
-    with log_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, sort_keys=True) + "\n")
+        record = {
+            "changed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "actor": actor,
+            "reason": reason,
+            "previous": previous or None,
+            "current": resolved,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
+
+    except Exception:
+        return None
 def resolve_latest_persona_version() -> str:
     """Resolve which persona version is currently active.
 
