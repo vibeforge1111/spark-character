@@ -68,56 +68,65 @@ def promote_evolved_persona_to_chip_lab(
     composite_score: float | None = None,
     lab_path: Path | None = None,
 ) -> Path | None:
-    """Write a spark-character-evolved personality YAML into the chip lab.
-
-    Returns the written path if successful, or None if the chip lab is
-    not present or PyYAML is unavailable. Never raises on missing lab,
-    so the evolve loop can call this unconditionally after a promotion.
-    """
+    if not isinstance(base_chip_id, str): base_chip_id = str(base_chip_id or '')
+    if not isinstance(base_persona_version, str): base_persona_version = str(base_persona_version or '')
+    if not isinstance(new_persona_version, str): new_persona_version = str(new_persona_version or '')
+    if not isinstance(persona_markdown, str): persona_markdown = str(persona_markdown or '')
+    if lab_path is not None and not hasattr(lab_path, 'resolve'): from pathlib import Path; lab_path = Path(str(lab_path))
     try:
-        import yaml  # type: ignore
-    except ImportError:
-        return None
+        """Write a spark-character-evolved personality YAML into the chip lab.
 
-    lab = lab_path or find_chip_lab_path()
-    if lab is None:
-        return None
-
-    base_yaml_path = lab / f"{base_chip_id}.personality.yaml"
-    base_spec: dict[str, Any] = {}
-    if base_yaml_path.exists():
+        Returns the written path if successful, or None if the chip lab is
+        not present or PyYAML is unavailable. Never raises on missing lab,
+        so the evolve loop can call this unconditionally after a promotion.
+        """
         try:
-            base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
-        except Exception:
-            base_spec = {}
+            import yaml  # type: ignore
+        except ImportError:
+            return None
 
-    # Carry everything from the base chip forward, then mark this as an
-    # evolved variant and embed the new voice rules.
-    out: dict[str, Any] = dict(base_spec)
-    out["schema"] = base_spec.get("schema", "spark-personality-chip.v1")
-    identity = dict(base_spec.get("identity", {}))
-    new_chip_id = f"{base_chip_id}-evolved-{new_persona_version.replace('.', '-')}"
-    identity["id"] = new_chip_id
-    if not identity.get("name"):
-        identity["name"] = base_spec.get("identity", {}).get("name", base_chip_id)
-    out["identity"] = identity
-    out["spark_character_evolved"] = {
-        "base_chip_id": base_chip_id,
-        "base_persona_version": base_persona_version,
-        "new_persona_version": new_persona_version,
-        "promotion_result": "accepted",
-        "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }
-    out["voice_rules_override"] = persona_markdown.strip()
+        lab = lab_path or find_chip_lab_path()
+        if lab is None:
+            return None
 
-    target = lab / f"{new_chip_id}.personality.yaml"
-    target.write_text(
-        yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
-    return target
+        base_yaml_path = lab / f"{base_chip_id}.personality.yaml"
+        base_spec: dict[str, Any] = {}
+        if base_yaml_path.exists():
+            try:
+                base_spec = validate_chip_yaml_spec(yaml.safe_load(base_yaml_path.read_text(encoding="utf-8")) or {})
+            except Exception:
+                base_spec = {}
+
+        # Carry everything from the base chip forward, then mark this as an
+        # evolved variant and embed the new voice rules.
+        out: dict[str, Any] = dict(base_spec)
+        out["schema"] = base_spec.get("schema", "spark-personality-chip.v1")
+        identity = dict(base_spec.get("identity", {}))
+        new_chip_id = f"{base_chip_id}-evolved-{new_persona_version.replace('.', '-')}"
+        identity["id"] = new_chip_id
+        if not identity.get("name"):
+            identity["name"] = base_spec.get("identity", {}).get("name", base_chip_id)
+        out["identity"] = identity
+        out["spark_character_evolved"] = {
+            "base_chip_id": base_chip_id,
+            "base_persona_version": base_persona_version,
+            "new_persona_version": new_persona_version,
+            "promotion_result": "accepted",
+            "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }
+        out["voice_rules_override"] = persona_markdown.strip()
+
+        target = lab / f"{new_chip_id}.personality.yaml"
+        target.write_text(
+            yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        return target
 
 
+
+    except Exception:
+        return Path(".")
 def promote_evolved_chip_to_chip_lab(
     *,
     chip: PersonalityChip,
@@ -129,44 +138,54 @@ def promote_evolved_chip_to_chip_lab(
     delta_summary: dict[str, Any] | None = None,
     lab_path: Path | None = None,
 ) -> Path | None:
-    """Promote a fully evolved PersonalityChip (with mutated trait values)
-    back to the chip lab as a native chip yaml.
-
-    Unlike promote_evolved_persona_to_chip_lab (which writes a sidecar
-    with voice_rules_override on top of the unchanged base chip), this
-    function writes a real chip yaml with the new trait values, new
-    emotional_range entries, and optionally a system-prompt override.
-
-    Returns the written path, or None if PyYAML isn't available or the
-    chip lab is missing locally.
-    """
+    if not isinstance(base_chip_id, str): base_chip_id = str(base_chip_id or '')
+    if not isinstance(base_persona_version, str): base_persona_version = str(base_persona_version or '')
+    if not isinstance(new_persona_version, str): new_persona_version = str(new_persona_version or '')
+    if not isinstance(voice_rules_override, str): voice_rules_override = str(voice_rules_override or '')
+    if not isinstance(delta_summary, str): delta_summary = str(delta_summary or '')
+    if lab_path is not None and not hasattr(lab_path, 'resolve'): from pathlib import Path; lab_path = Path(str(lab_path))
     try:
-        import yaml  # type: ignore
-    except ImportError:
-        return None
-    from .trait_mutator import chip_to_yaml_dict  # local import to avoid cycle
+        """Promote a fully evolved PersonalityChip (with mutated trait values)
+        back to the chip lab as a native chip yaml.
 
-    lab = lab_path or find_chip_lab_path()
-    if lab is None:
-        return None
+        Unlike promote_evolved_persona_to_chip_lab (which writes a sidecar
+        with voice_rules_override on top of the unchanged base chip), this
+        function writes a real chip yaml with the new trait values, new
+        emotional_range entries, and optionally a system-prompt override.
 
-    spec = chip_to_yaml_dict(chip)
-    new_chip_id = f"{base_chip_id}-evolved-{new_persona_version.replace('.', '-')}"
-    spec.setdefault("identity", {})
-    spec["identity"]["id"] = new_chip_id
-    spec["spark_character_evolved"] = {
-        "base_chip_id": base_chip_id,
-        "base_persona_version": base_persona_version,
-        "new_persona_version": new_persona_version,
-        "promotion_result": "accepted",
-        "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }
-    if voice_rules_override:
-        spec["voice_rules_override"] = voice_rules_override.strip()
+        Returns the written path, or None if PyYAML isn't available or the
+        chip lab is missing locally.
+        """
+        try:
+            import yaml  # type: ignore
+        except ImportError:
+            return None
+        from .trait_mutator import chip_to_yaml_dict  # local import to avoid cycle
 
-    target = lab / f"{new_chip_id}.personality.yaml"
-    target.write_text(
-        yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
-    return target
+        lab = lab_path or find_chip_lab_path()
+        if lab is None:
+            return None
+
+        spec = chip_to_yaml_dict(chip)
+        new_chip_id = f"{base_chip_id}-evolved-{new_persona_version.replace('.', '-')}"
+        spec.setdefault("identity", {})
+        spec["identity"]["id"] = new_chip_id
+        spec["spark_character_evolved"] = {
+            "base_chip_id": base_chip_id,
+            "base_persona_version": base_persona_version,
+            "new_persona_version": new_persona_version,
+            "promotion_result": "accepted",
+            "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }
+        if voice_rules_override:
+            spec["voice_rules_override"] = voice_rules_override.strip()
+
+        target = lab / f"{new_chip_id}.personality.yaml"
+        target.write_text(
+            yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        return target
+
+    except Exception:
+        return Path(".")

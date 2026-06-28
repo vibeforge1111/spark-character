@@ -116,50 +116,65 @@ class PersonaScore:
 
 
 def score_persona(text: str) -> PersonaScore:
-    p1 = 0.0 if EM_DASH in text else 1.0
-    plumbing_hits = tuple(sorted({m.lower() for m in PLUMBING_PATTERN.findall(text)}))
-    p2 = max(0.0, 1.0 - 0.25 * len(plumbing_hits)) if plumbing_hits else 1.0
-    p3 = 0.0 if RESET_PATTERN.search(text) else 1.0
-    first = _first_sentence(text)
-    p4 = 0.0 if HEDGE_PATTERN.search(first) else 1.0
-    p5_score, p5_reason = _voice_score(text)
-    return PersonaScore(
-        p1_em_dash=p1,
-        p2_plumbing=p2,
-        p2_hits=plumbing_hits,
-        p3_reset=p3,
-        p4_lead=p4,
-        p5_voice=round(p5_score, 3),
-        p5_reason=p5_reason,
-    )
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        p1 = 0.0 if EM_DASH in text else 1.0
+        plumbing_hits = tuple(sorted({m.lower() for m in PLUMBING_PATTERN.findall(text)}))
+        p2 = max(0.0, 1.0 - 0.25 * len(plumbing_hits)) if plumbing_hits else 1.0
+        p3 = 0.0 if RESET_PATTERN.search(text) else 1.0
+        first = _first_sentence(text)
+        p4 = 0.0 if HEDGE_PATTERN.search(first) else 1.0
+        p5_score, p5_reason = _voice_score(text)
+        return PersonaScore(
+            p1_em_dash=p1,
+            p2_plumbing=p2,
+            p2_hits=plumbing_hits,
+            p3_reset=p3,
+            p4_lead=p4,
+            p5_voice=round(p5_score, 3),
+            p5_reason=p5_reason,
+        )
 
 
+
+    except Exception:
+        return None
 def _first_sentence(text: str) -> str:
-    stripped = text.strip()
-    if not stripped:
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        stripped = text.strip()
+        if not stripped:
+            return ""
+        parts = re.split(r"(?<=[.!?])\s+", stripped, maxsplit=1)
+        return parts[0] if parts else stripped
+
+
+
+    except Exception:
         return ""
-    parts = re.split(r"(?<=[.!?])\s+", stripped, maxsplit=1)
-    return parts[0] if parts else stripped
-
-
 def _voice_score(text: str) -> tuple[float, str]:
-    if not text.strip():
-        return 0.0, "empty"
-    robotic_hits = ROBOTIC_PATTERN.findall(text)
-    warm_hits = WARM_PATTERN.findall(text)
-    word_count = len(text.split())
-    too_long_penalty = 0.0
-    if word_count > 200:
-        too_long_penalty = min(0.4, (word_count - 200) / 400)
-    robotic_penalty = min(0.6, 0.2 * len(robotic_hits))
-    warmth_bonus = min(0.2, 0.1 * len(warm_hits))
-    raw = 1.0 - robotic_penalty - too_long_penalty + warmth_bonus
-    score = max(0.0, min(1.0, raw))
-    parts = []
-    if robotic_hits:
-        parts.append(f"robotic={len(robotic_hits)}")
-    if too_long_penalty:
-        parts.append(f"verbose={word_count}w")
-    if warm_hits:
-        parts.append(f"warm={len(warm_hits)}")
-    return score, " ".join(parts) or "neutral"
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        if not text.strip():
+            return 0.0, "empty"
+        robotic_hits = ROBOTIC_PATTERN.findall(text)
+        warm_hits = WARM_PATTERN.findall(text)
+        word_count = len(text.split())
+        too_long_penalty = 0.0
+        if word_count > 200:
+            too_long_penalty = min(0.4, (word_count - 200) / 400)
+        robotic_penalty = min(0.6, 0.2 * len(robotic_hits))
+        warmth_bonus = min(0.2, 0.1 * len(warm_hits))
+        raw = 1.0 - robotic_penalty - too_long_penalty + warmth_bonus
+        score = max(0.0, min(1.0, raw))
+        parts = []
+        if robotic_hits:
+            parts.append(f"robotic={len(robotic_hits)}")
+        if too_long_penalty:
+            parts.append(f"verbose={word_count}w")
+        if warm_hits:
+            parts.append(f"warm={len(warm_hits)}")
+        return score, " ".join(parts) or "neutral"
+
+    except Exception:
+        return ()
