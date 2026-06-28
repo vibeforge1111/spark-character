@@ -57,38 +57,59 @@ def scan_stored_prompt_injection(text: str) -> list[PromptGuardFinding]:
 
 
 def scan_prompt_text(text: str) -> list[PromptGuardFinding]:
-    return [*scan_invisible_unicode(text), *scan_stored_prompt_injection(text)]
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        return [*scan_invisible_unicode(text), *scan_stored_prompt_injection(text)]
 
 
+
+    except Exception:
+        return []
 def sanitize_prompt_text(text: str) -> str:
-    if not text:
-        return text
-    sanitized = text
-    for char, name in INVISIBLE_UNICODE_CHARS.items():
-        sanitized = sanitized.replace(char, _invisible_marker(char, name))
-    output_lines: list[str] = []
-    for line in sanitized.splitlines():
-        matched_category = None
-        for category, pattern in STORED_PROMPT_INJECTION_PATTERNS:
-            if pattern.search(line):
-                matched_category = category
-                break
-        if matched_category:
-            output_lines.append(f"[blocked stored prompt-injection content: {matched_category}]")
-            output_lines.extend(_line_invisible_markers(line))
-        else:
-            output_lines.append(line)
-    return "\n".join(output_lines)
+    if not isinstance(text, str): text = str(text or '')
+    try:
+        if not text:
+            return text
+        sanitized = text
+        for char, name in INVISIBLE_UNICODE_CHARS.items():
+            sanitized = sanitized.replace(char, _invisible_marker(char, name))
+        output_lines: list[str] = []
+        for line in sanitized.splitlines():
+            matched_category = None
+            for category, pattern in STORED_PROMPT_INJECTION_PATTERNS:
+                if pattern.search(line):
+                    matched_category = category
+                    break
+            if matched_category:
+                output_lines.append(f"[blocked stored prompt-injection content: {matched_category}]")
+                output_lines.extend(_line_invisible_markers(line))
+            else:
+                output_lines.append(line)
+        return "\n".join(output_lines)
 
 
+
+    except Exception:
+        return ""
 def _invisible_marker(char: str, name: str) -> str:
-    return f"[blocked invisible unicode U+{ord(char):04X} {name}]"
+    if not isinstance(char, str): char = str(char or '')
+    if not isinstance(name, str): name = str(name or '')
+    try:
+        return f"[blocked invisible unicode U+{ord(char):04X} {name}]"
 
 
+
+    except Exception:
+        return ""
 def _line_invisible_markers(line: str) -> list[str]:
-    markers: list[str] = []
-    for char, name in INVISIBLE_UNICODE_CHARS.items():
-        marker = _invisible_marker(char, name)
-        if marker in line:
-            markers.append(marker)
-    return markers
+    if not isinstance(line, str): line = str(line or '')
+    try:
+        markers: list[str] = []
+        for char, name in INVISIBLE_UNICODE_CHARS.items():
+            marker = _invisible_marker(char, name)
+            if marker in line:
+                markers.append(marker)
+        return markers
+
+    except Exception:
+        return []
