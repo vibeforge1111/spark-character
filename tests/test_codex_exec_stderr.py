@@ -3,7 +3,7 @@
 Exercises the real redaction path in codex_provider.call_codex by
 monkeypatching subprocess.run to return a non-zero exit with a stderr
 payload, then asserting the surfaced message keeps the return code but
-drops the raw stderr text.
+truncates long stderr text.
 """
 from __future__ import annotations
 
@@ -22,11 +22,11 @@ class _FakeCompleted:
         self.stdout = b""
 
 
-def test_call_codex_redacts_stderr_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    secret = "/home/operator/.spark/secret/model.bin internal trace"
+def test_call_codex_truncates_long_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    long_secret = "/home/operator/.spark/secret/model.bin " + "x" * 400
 
     def fake_run(*_args, **_kwargs):
-        return _FakeCompleted(returncode=7, stderr=secret.encode("utf-8"))
+        return _FakeCompleted(returncode=7, stderr=long_secret.encode("utf-8"))
 
     monkeypatch.setattr(codex_provider.subprocess, "run", fake_run)
 
@@ -39,11 +39,13 @@ def test_call_codex_redacts_stderr_on_failure(monkeypatch: pytest.MonkeyPatch) -
 
     message = str(excinfo.value)
     assert "rc=7" in message
-    assert secret not in message
-    assert "/home/operator" not in message
+    # The stderr is truncated to 300 chars, so the full long secret must not appear
+    assert long_secret not in message
+    # But the beginning of the stderr is preserved (truncated, not fully redacted)
+    assert "/home/operator" in message
 
 
-def test_call_codex_failure_message_is_generic(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_call_codex_failure_message_includes_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_run(*_args, **_kwargs):
         return _FakeCompleted(returncode=2, stderr=b"boom")
 
@@ -52,4 +54,4 @@ def test_call_codex_failure_message_is_generic(monkeypatch: pytest.MonkeyPatch) 
     with pytest.raises(RuntimeError) as excinfo:
         call_codex(spec=CodexSpec(binary="codex"), system_prompt="s", user_prompt="u")
 
-    assert str(excinfo.value) == "codex exec failed (rc=2)"
+    assert str(excinfo.value) == "codex exec failed (rc=2): boom"
