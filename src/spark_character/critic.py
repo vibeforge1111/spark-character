@@ -44,3 +44,62 @@ def load_critic(version: str = DEFAULT_CRITIC_VERSION) -> CriticSpec:
     if not path.exists():
         raise FileNotFoundError("Critic artifact not found")
     return CriticSpec(version=version, text=sanitize_prompt_text(path.read_text(encoding="utf-8")))
+
+
+def _build_critic_user_prompt(persona: PersonaSpec, draft: str) -> str:
+    return (
+        "[Persona spec]\n"
+        f"{persona.system_prompt}\n\n"
+        "[Draft reply]\n"
+        f"{draft}\n\n"
+        "Apply the rules. Return PASS or the rewritten reply only."
+    )
+
+
+def critique(
+    *,
+    provider: ProviderSpec,
+    persona: PersonaSpec,
+    critic: CriticSpec,
+    draft: str,
+    temperature: float = 0.2,
+    max_tokens: int = 600,
+) -> CritiqueResult:
+    user_prompt = _build_critic_user_prompt(persona, draft)
+    response = call_provider(
+        provider=provider,
+        system_prompt=critic.system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    return _interpret(draft, response)
+
+
+async def critique_async(
+    *,
+    provider: ProviderSpec,
+    persona: PersonaSpec,
+    critic: CriticSpec,
+    draft: str,
+    temperature: float = 0.2,
+    max_tokens: int = 600,
+) -> CritiqueResult:
+    user_prompt = _build_critic_user_prompt(persona, draft)
+    response = await call_provider_async(
+        provider=provider,
+        system_prompt=critic.system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    return _interpret(draft, response)
+
+
+def _interpret(draft: str, response: str) -> CritiqueResult:
+    cleaned = response.strip()
+    if not cleaned:
+        return CritiqueResult(final=draft, rewritten=False, draft=draft)
+    if cleaned.strip().upper() == PASS_TOKEN:
+        return CritiqueResult(final=draft, rewritten=False, draft=draft)
+    return CritiqueResult(final=cleaned, rewritten=True, draft=draft)
