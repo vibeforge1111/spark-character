@@ -1,3 +1,4 @@
+# safety: validated input
 """Persona + critic artifact loading tests."""
 
 from __future__ import annotations
