@@ -331,6 +331,7 @@ def main() -> int:
         "(6-7 turns each, ~3x cost of a normal full eval). "
         "Recommended for daily/weekly cycles, not hourly.",
     )
+    parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no-op)")
     args = parser.parse_args()
 
     history_path = Path(args.history_file)
