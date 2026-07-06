@@ -148,6 +148,7 @@ def main() -> int:
         default="0.20,0.30,0.20,0.10,0.10,0.10",
         help="comma-separated weights for T1,T2,T3,T6,T7,T8",
     )
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
     args = parser.parse_args()
 
     weights = tuple(float(w) for w in args.weights.split(","))
