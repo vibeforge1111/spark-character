@@ -1,3 +1,4 @@
+__version__ = "0.24.0"
 """spark-character: provider-agnostic voice and character for Spark agents."""
 
 from .audit_miner import (
