@@ -49,6 +49,7 @@ from spark_character import (  # noqa: E402
     load_persona,
     score_distinctiveness,
     score_persona,
+    validate_provider_base_url,
 )
 
 
@@ -80,7 +81,9 @@ def resolve_providers(names: list[str]) -> list[ProviderProfile]:
             out.append(ProviderProfile(
                 name="zai",
                 spec=ProviderSpec(
-                    base_url=os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/coding/paas/v4/"),
+                    base_url=validate_provider_base_url(
+                        os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/coding/paas/v4/")
+                    ),
                     model=os.environ.get("ZAI_MODEL", "glm-5.1"),
                     api_key=api_key,
                 ),
@@ -92,7 +95,9 @@ def resolve_providers(names: list[str]) -> list[ProviderProfile]:
             out.append(ProviderProfile(
                 name="openai",
                 spec=ProviderSpec(
-                    base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1/"),
+                    base_url=validate_provider_base_url(
+                        os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1/")
+                    ),
                     model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
                     api_key=api_key,
                 ),
@@ -104,7 +109,9 @@ def resolve_providers(names: list[str]) -> list[ProviderProfile]:
             out.append(ProviderProfile(
                 name="minimax",
                 spec=ProviderSpec(
-                    base_url=os.environ.get("MINIMAX_BASE_URL", "https://api.minimax.io/v1/"),
+                    base_url=validate_provider_base_url(
+                        os.environ.get("MINIMAX_BASE_URL", "https://api.minimax.io/v1/")
+                    ),
                     model=os.environ.get("MINIMAX_MODEL", "MiniMax-M2.7"),
                     api_key=api_key,
                 ),

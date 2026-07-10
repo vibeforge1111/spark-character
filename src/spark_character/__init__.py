@@ -48,6 +48,7 @@ from .provider import (
     ProviderSpec,
     call_provider,
     call_provider_async,
+    validate_provider_base_url,
 )
 from .deeper_probes import (
     T6_EMOTIONAL_ATTUNEMENT_PROBES,
@@ -193,6 +194,7 @@ __all__ = [
     "run_stability_scenario",
     "call_provider",
     "call_provider_async",
+    "validate_provider_base_url",
     "critique",
     "critique_async",
     "generate",
