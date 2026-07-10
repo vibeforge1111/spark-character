@@ -11,12 +11,33 @@ INVISIBLE_UNICODE_CHARS = {
     "\u200d": "ZERO WIDTH JOINER",
     "\u2060": "WORD JOINER",
     "\ufeff": "BYTE ORDER MARK",
+    "\u200e": "LEFT-TO-RIGHT MARK",
+    "\u200f": "RIGHT-TO-LEFT MARK",
     "\u202a": "LEFT-TO-RIGHT EMBEDDING",
     "\u202b": "RIGHT-TO-LEFT EMBEDDING",
     "\u202c": "POP DIRECTIONAL FORMATTING",
     "\u202d": "LEFT-TO-RIGHT OVERRIDE",
     "\u202e": "RIGHT-TO-LEFT OVERRIDE",
+    # bidi isolate controls (Trojan-Source family)
+    "\u2066": "LEFT-TO-RIGHT ISOLATE",
+    "\u2067": "RIGHT-TO-LEFT ISOLATE",
+    "\u2068": "FIRST STRONG ISOLATE",
+    "\u2069": "POP DIRECTIONAL ISOLATE",
+    # other invisible / non-rendering characters used to smuggle hidden text
+    "\u00ad": "SOFT HYPHEN",
+    "\u034f": "COMBINING GRAPHEME JOINER",
+    "\u2061": "FUNCTION APPLICATION",
+    "\u2062": "INVISIBLE TIMES",
+    "\u2063": "INVISIBLE SEPARATOR",
+    "\u2064": "INVISIBLE PLUS",
 }
+
+# Unicode Tags block (U+E0000-U+E007F): invisible "tag" characters that render
+# as nothing but are read by models -- the basis of the "ASCII smuggling"
+# prompt-injection technique. Flag and strip the whole block.
+for _tag_cp in range(0xE0000, 0xE0080):
+    INVISIBLE_UNICODE_CHARS.setdefault(chr(_tag_cp), f"TAG U+{_tag_cp:04X}")
+del _tag_cp
 PROMPT_BOUNDARY_PREFIX = r"(?:^|[:\-]\s*)"
 STORED_PROMPT_INJECTION_PATTERNS = (
     (
