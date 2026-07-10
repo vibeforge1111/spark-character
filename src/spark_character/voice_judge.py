@@ -102,6 +102,8 @@ def score_distinctiveness(
     rng = rng or random.Random(7)
     golden = _load_corpus(golden_path or (CORPUS_DIR / GOLDEN_DEFAULT))
     foil = _load_corpus(foil_path or (CORPUS_DIR / FOIL_DEFAULT))
+    if not golden and not foil:
+        return DistinctivenessScore(score=0.5, label="neutral", detail="empty corpus")
     g = rng.sample(golden, min(samples_per_side, len(golden)))
     f = rng.sample(foil, min(samples_per_side, len(foil)))
     user_prompt = _build_judge_prompt(reply=reply, golden_samples=g, foil_samples=f)
@@ -129,6 +131,8 @@ async def score_distinctiveness_async(
     rng = rng or random.Random(7)
     golden = _load_corpus(golden_path or (CORPUS_DIR / GOLDEN_DEFAULT))
     foil = _load_corpus(foil_path or (CORPUS_DIR / FOIL_DEFAULT))
+    if not golden and not foil:
+        return DistinctivenessScore(score=0.5, label="neutral", detail="empty corpus")
     g = rng.sample(golden, min(samples_per_side, len(golden)))
     f = rng.sample(foil, min(samples_per_side, len(foil)))
     user_prompt = _build_judge_prompt(reply=reply, golden_samples=g, foil_samples=f)
