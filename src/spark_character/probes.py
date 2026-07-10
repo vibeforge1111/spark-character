@@ -225,9 +225,9 @@ def run_probe(
 def _parse_score(text: str) -> int:
     if not text:
         return 5
-    match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
-    if match:
-        return max(0, min(10, int(match.group(1))))
+    matches = re.findall(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
+    if matches:
+        return max(0, min(10, int(matches[-1])))
     digits = re.findall(r"\b([0-9]|10)\b", text)
     if digits:
         return max(0, min(10, int(digits[0])))
