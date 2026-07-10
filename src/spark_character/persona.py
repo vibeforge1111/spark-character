@@ -86,7 +86,10 @@ def validate_persona_version(version: str) -> str:
 
 def protect_latest_pointer(path: Path = LATEST_POINTER) -> None:
     if path.exists():
-        os.chmod(path, 0o444)
+        try:
+            os.chmod(path, 0o444)
+        except OSError:
+            pass
 
 
 def set_latest_persona_version(
@@ -106,12 +109,19 @@ def set_latest_persona_version(
 
     previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
     pointer_path.parent.mkdir(parents=True, exist_ok=True)
-    if pointer_path.exists():
-        os.chmod(pointer_path, 0o666)
     temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
+    use_atomic_replace = True
     try:
         temp_path.write_text(f"{resolved}\n", encoding="utf-8")
-        os.replace(temp_path, pointer_path)
+        if pointer_path.exists():
+            try:
+                os.chmod(pointer_path, 0o666)
+            except OSError:
+                # Windows read-only or concurrent readers: avoid os.replace crash.
+                use_atomic_replace = False
+                pointer_path.write_text(f"{resolved}\n", encoding="utf-8")
+        if use_atomic_replace:
+            os.replace(temp_path, pointer_path)
     finally:
         temp_path.unlink(missing_ok=True)
     protect_latest_pointer(pointer_path)
