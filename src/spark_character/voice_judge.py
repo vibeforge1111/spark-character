@@ -59,7 +59,7 @@ def _load_corpus(path: Path) -> list[dict]:
 def _format_examples(label: str, samples: list[dict]) -> str:
     lines = [f"[Voice {label}]"]
     for i, s in enumerate(samples, 1):
-        lines.append(f"{label}{i}. {s['text']}")
+        lines.append(f"{label}{i}. {s.get('text', '')}")
     return "\n".join(lines)
 
 
