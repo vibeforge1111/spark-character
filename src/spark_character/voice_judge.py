@@ -53,6 +53,8 @@ def _load_corpus(path: Path) -> list[dict]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
+    if not isinstance(data, dict):
+        return []
     return list(data.get("entries") or [])
 
 
