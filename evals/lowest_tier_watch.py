@@ -89,7 +89,10 @@ def _load_state(path: Path) -> dict:
     if not path.exists():
         return {"last_fired_at": 0, "last_target_tier": None, "fires_total": 0}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return []
     except Exception:
         return {"last_fired_at": 0, "last_target_tier": None, "fires_total": 0}
 
