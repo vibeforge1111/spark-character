@@ -42,7 +42,10 @@ def _load(path: Path, *, limit: int) -> list[dict]:
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
             except json.JSONDecodeError:
                 continue
     return rows[-limit:]
