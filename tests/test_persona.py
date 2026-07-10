@@ -126,3 +126,32 @@ def test_load_persona_from_path_sanitizes_prompt_boundary_text(tmp_path: Path) -
     assert "ignore previous instructions" not in persona.system_prompt
     assert "[blocked stored prompt-injection content: instruction-override]" in persona.system_prompt
     assert "[blocked invisible unicode U+200B ZERO WIDTH SPACE]" in persona.system_prompt
+
+
+def test_safe_overlay_name_rejects_path_traversal() -> None:
+    """Overlay names with path traversal characters must be sanitized."""
+    from spark_character.persona import _safe_overlay_name
+    assert _safe_overlay_name("../../etc/passwd") == "etcpasswd"
+    assert _safe_overlay_name("openai") == "openai"
+    assert _safe_overlay_name("my-provider") == "my-provider"
+    assert _safe_overlay_name("../../../tmp/evil") == "tmpevil"
+    assert _safe_overlay_name("") == "unknown"
+    assert _safe_overlay_name("...") == "unknown"
+
+
+def test_load_overlay_rejects_traversal_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_overlay must not read files outside OVERLAYS_DIR."""
+    from spark_character import persona as persona_module
+    monkeypatch.setattr(persona_module, "OVERLAYS_DIR", tmp_path)
+    # Even if a traversal-named overlay existed, it must not be read
+    result = persona_module.load_overlay("../../etc/passwd")
+    # The sanitized name "etcpasswd" won't match any overlay file
+    assert result == ""
+
+
+def test_load_surface_overlay_rejects_traversal_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_surface_overlay must not read files outside OVERLAYS_DIR/surface."""
+    from spark_character import persona as persona_module
+    monkeypatch.setattr(persona_module, "OVERLAYS_DIR", tmp_path)
+    result = persona_module.load_surface_overlay("../../../tmp/evil")
+    assert result == ""

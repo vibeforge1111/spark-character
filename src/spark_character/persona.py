@@ -40,8 +40,11 @@ def load_overlay(provider_kind: str | None) -> str:
     'openai', 'ollama'. Unknown kinds return ''."""
     if not provider_kind:
         return ""
-    path = OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md"
+    safe_name = _safe_overlay_name(provider_kind)
+    path = OVERLAYS_DIR / f"{safe_name}.md"
     if not path.exists():
+        return ""
+    if not str(path.resolve()).startswith(str(OVERLAYS_DIR.resolve()) + os.sep:
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
 
@@ -52,10 +55,21 @@ def load_surface_overlay(surface: str | None) -> str:
     'tui', 'cli'. Unknown surfaces return ''."""
     if not surface:
         return ""
-    path = OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md"
+    safe_name = _safe_overlay_name(surface)
+    path = OVERLAYS_DIR / "surface" / f"{safe_name}.md"
     if not path.exists():
         return ""
+    if not str(path.resolve()).startswith(str((OVERLAYS_DIR / "surface").resolve()) + os.sep):
+        return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
+
+
+def _safe_overlay_name(name: str) -> str:
+    """Sanitize overlay name to prevent path traversal. Only allow
+    alphanumeric, hyphens, and underscores."""
+    import re as _re
+    sanitized = _re.sub(r"[^a-zA-Z0-9_-]", "", name.lower().strip())
+    return sanitized or "unknown"
 
 
 def detect_provider_kind(provider) -> str | None:
