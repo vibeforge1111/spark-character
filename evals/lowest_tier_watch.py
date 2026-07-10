@@ -70,6 +70,8 @@ TIER_TARGETED_WEIGHTS = {
 
 
 def _load(path: Path, *, limit: int = 200) -> list[dict]:
+    if limit <= 0:
+        return []
     if not path.exists():
         return []
     rows: list[dict] = []

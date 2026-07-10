@@ -143,6 +143,8 @@ def _append_history(history_path: Path, row: dict) -> None:
 
 
 def _load_history(history_path: Path, *, limit: int = 100) -> list[dict]:
+    if limit <= 0:
+        return []
     if not history_path.exists():
         return []
     rows: list[dict] = []
