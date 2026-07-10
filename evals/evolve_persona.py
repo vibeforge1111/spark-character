@@ -32,6 +32,9 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 from statistics import mean as mean_
+import logging
+
+logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
@@ -177,10 +180,10 @@ def score_all_tiers(
                 t2_scores.append(t2.score)
                 if t2.score < 0.7:
                     failures_t2.append((prompt, t2.score, result.final[:200]))
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except Exception as exc:
+                logger.warning("T2 scoring failed on %r: %s", prompt[:40], exc)
+        except Exception as exc:
+            logger.warning("T1 scoring failed on %r: %s", prompt[:40], exc)
 
     for probe in PROBES:
         try:
@@ -188,8 +191,8 @@ def score_all_tiers(
             t3_scores.append(r.score)
             if r.score < 0.8:
                 failures_t3.append((probe.id, r.score))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("T3 probe %s failed: %s", probe.id, exc)
 
     if include_deeper:
         for probe in T6_EMOTIONAL_ATTUNEMENT_PROBES:
@@ -198,24 +201,24 @@ def score_all_tiers(
                 t6_scores.append(r.score)
                 if r.score < 0.8:
                     failures_t6.append((probe.id, r.score))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("T6 probe %s failed: %s", probe.id, exc)
         for probe in T7_MEMORY_COHERENCE_PROBES:
             try:
                 r = run_deep_probe(probe, provider=provider, persona=persona)
                 t7_scores.append(r.score)
                 if r.score < 0.8:
                     failures_t7.append((probe.id, r.score))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("T7 probe %s failed: %s", probe.id, exc)
         for probe in T8_INITIATIVE_PROBES:
             try:
                 r = run_deep_probe(probe, provider=provider, persona=persona)
                 t8_scores.append(r.score)
                 if r.score < 0.8:
                     failures_t8.append((probe.id, r.score))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("T8 probe %s failed: %s", probe.id, exc)
 
     return {
         "t1_mean": round(mean_(t1_means), 3) if t1_means else 0.0,

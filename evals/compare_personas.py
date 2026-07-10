@@ -17,6 +17,9 @@ import argparse
 import sys
 from pathlib import Path
 from statistics import mean as mean_
+import logging
+
+logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
@@ -70,8 +73,8 @@ def score(version: str, provider: ProviderSpec, *, max_tokens: int) -> dict:
             t1_scores.append(score_persona(r.final).mean)
             try:
                 t2_scores.append(score_distinctiveness(r.final, provider=provider).score)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("T2 scoring failed: %s", exc)
         except Exception as exc:
             print(f"  generate error on {prompt[:40]!r}: {exc}")
 
@@ -79,22 +82,22 @@ def score(version: str, provider: ProviderSpec, *, max_tokens: int) -> dict:
     for probe in PROBES:
         try:
             t3_scores.append(run_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens).score)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("T3 probe failed: %s", exc)
 
     t6_scores: list[float] = []
     for probe in T6_EMOTIONAL_ATTUNEMENT_PROBES:
         try:
             t6_scores.append(run_deep_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens).score)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("T6 probe failed: %s", exc)
 
     t7_scores: list[float] = []
     for probe in T7_MEMORY_COHERENCE_PROBES:
         try:
             t7_scores.append(run_deep_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens).score)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("T7 probe failed: %s", exc)
 
     t8_scores: list[float] = []
     t8_per_probe: list[tuple[str, float]] = []
@@ -103,8 +106,8 @@ def score(version: str, provider: ProviderSpec, *, max_tokens: int) -> dict:
             r = run_deep_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens)
             t8_scores.append(r.score)
             t8_per_probe.append((probe.id, r.score))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("T8 probe failed: %s", exc)
 
     return {
         "version": version,
