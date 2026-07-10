@@ -98,19 +98,21 @@ class Observation:
     parsed: dict
 
 
-def _load_seen(path: Path) -> set[str]:
+def _load_seen(path: Path) -> dict[str, None]:
     if not path.exists():
-        return set()
+        return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return set(data.get("seen_trace_refs", []))
+        return dict.fromkeys(data.get("seen_trace_refs", []))
     except Exception:
-        return set()
+        return {}
 
 
-def _save_seen(path: Path, seen: set[str]) -> None:
+def _save_seen(path: Path, seen: dict[str, None]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Cap stored IDs to last 5000 to bound state size
+    # dict preserves insertion order (Python 3.7+), so the tail
+    # always contains the most-recently-added trace_refs.
     capped = list(seen)[-5000:]
     path.write_text(
         json.dumps({"seen_trace_refs": capped}, indent=2),
@@ -344,7 +346,7 @@ def main() -> int:
         _append_observation(obs_path, obs)
         observed_count += 1
         if trace_ref:
-            seen.add(trace_ref)
+            seen[trace_ref] = None
         scores = parsed.get("scores", {})
         rec = parsed.get("recommendation_tier", "?")
         landed = (parsed.get("landed_well") or "")[:100]
