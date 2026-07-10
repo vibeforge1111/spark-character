@@ -65,6 +65,7 @@ from spark_character import (  # noqa: E402
     T14_MEMORABILITY_PROBES,
     AuditMiner,
     ProviderSpec,
+    validate_provider_base_url,
     generate,
     load_persona,
     run_deep_probe,
@@ -107,8 +108,9 @@ def resolve_provider(name: str) -> ProviderSpec | None:
     api_key = os.environ.get(cfg["api_key_env"])
     if not api_key:
         return None
+    base_url = os.environ.get(cfg["base_url_env"], cfg["default_base"])
     return ProviderSpec(
-        base_url=os.environ.get(cfg["base_url_env"], cfg["default_base"]),
+        base_url=validate_provider_base_url(base_url),
         model=os.environ.get(cfg["model_env"], cfg["default_model"]),
         api_key=api_key,
     )
