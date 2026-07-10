@@ -152,7 +152,10 @@ def _load_history(history_path: Path, *, limit: int = 100) -> list[dict]:
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
             except json.JSONDecodeError:
                 continue
     return rows[-limit:]
