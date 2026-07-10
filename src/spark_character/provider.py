@@ -10,6 +10,7 @@ response shape.
 
 from __future__ import annotations
 
+import json as _json
 import os
 import re
 from dataclasses import dataclass
@@ -17,6 +18,65 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+
+# Maximum response body size in bytes (50 MB). Prevents OOM from
+# misconfigured providers returning multi-GB payloads.
+MAX_RESPONSE_BODY_BYTES: int = 50 * 1024 * 1024
+
+
+class ResponseBodyTooLarge(RuntimeError):
+    """Raised when a provider response exceeds the allowed body size."""
+
+
+def _check_content_length(resp: httpx.Response) -> None:
+    """Reject responses whose Content-Length header exceeds MAX_RESPONSE_BODY_BYTES."""
+    content_length = resp.headers.get("content-length")
+    if content_length is not None:
+        try:
+            length = int(content_length)
+        except ValueError:
+            return  # malformed; we'll catch size issues during read
+        if length > MAX_RESPONSE_BODY_BYTES:
+            raise ResponseBodyTooLarge(
+                f"Provider response Content-Length {length} bytes "
+                f"exceeds limit of {MAX_RESPONSE_BODY_BYTES} bytes."
+            )
+
+
+def _read_stream_body(resp: httpx.Response) -> bytes:
+    """Read a streaming response body, enforcing MAX_RESPONSE_BODY_BYTES.
+
+    Must be called while the response stream is still open (inside a
+    ``client.stream(...)`` context).
+    """
+    _check_content_length(resp)
+    chunks: list[bytes] = []
+    total = 0
+    for chunk in resp.iter_bytes(chunk_size=65536):
+        total += len(chunk)
+        if total > MAX_RESPONSE_BODY_BYTES:
+            raise ResponseBodyTooLarge(
+                f"Provider response body exceeded "
+                f"{MAX_RESPONSE_BODY_BYTES} bytes while streaming."
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _read_stream_body_async(resp: httpx.Response) -> bytes:
+    """Async variant of _read_stream_body."""
+    _check_content_length(resp)
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in resp.aiter_bytes(chunk_size=65536):
+        total += len(chunk)
+        if total > MAX_RESPONSE_BODY_BYTES:
+            raise ResponseBodyTooLarge(
+                f"Provider response body exceeded "
+                f"{MAX_RESPONSE_BODY_BYTES} bytes while streaming."
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 ALLOWED_PROVIDER_HOSTS = frozenset(
@@ -79,15 +139,20 @@ def _join_url(base_url: str, path_name: str) -> str:
     return f"{safe_base_url.rstrip('/')}/{path_name.lstrip('/')}"
 
 
-def _parse_provider_response_json(resp: httpx.Response) -> dict[str, Any]:
-    """Parse provider JSON without leaking raw provider bodies in errors."""
+def _parse_provider_response_json(resp: httpx.Response, raw_body: bytes) -> dict[str, Any]:
+    """Parse provider JSON without leaking raw provider bodies in errors.
+
+    *raw_body* is the pre-read, size-checked response bytes so that
+    ``resp.json()`` (which would re-read without a size cap) is never
+    called directly.
+    """
     content_type = (resp.headers.get("content-type") or "").lower()
     if content_type and "json" not in content_type:
         raise RuntimeError(
             f"Provider returned non-JSON content-type (status {resp.status_code}): {content_type}"
         )
     try:
-        body = resp.json()
+        body = _json.loads(raw_body)
     except ValueError as exc:
         raise RuntimeError(f"Provider returned invalid JSON (status {resp.status_code}).") from exc
     if not isinstance(body, dict):
@@ -136,9 +201,10 @@ def call_provider(
     }
     url = _join_url(provider.base_url, "chat/completions")
     with httpx.Client(timeout=provider.timeout_seconds) as client:
-        resp = client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        body = _parse_provider_response_json(resp)
+        with client.stream("POST", url, json=payload, headers=headers) as resp:
+            resp.raise_for_status()
+            raw_body = _read_stream_body(resp)
+            body = _parse_provider_response_json(resp, raw_body)
     return _extract_text(body)
 
 
@@ -173,9 +239,10 @@ async def call_provider_async(
     }
     url = _join_url(provider.base_url, "chat/completions")
     async with httpx.AsyncClient(timeout=provider.timeout_seconds) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        body = _parse_provider_response_json(resp)
+        async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            resp.raise_for_status()
+            raw_body = await _read_stream_body_async(resp)
+            body = _parse_provider_response_json(resp, raw_body)
     return _extract_text(body)
 
 

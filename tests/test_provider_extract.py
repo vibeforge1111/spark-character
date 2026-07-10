@@ -7,6 +7,7 @@ import pytest
 
 from spark_character.provider import (
     ProviderSpec,
+    ResponseBodyTooLarge,
     _extract_text,
     _join_url,
     _parse_provider_response_json,
@@ -86,9 +87,10 @@ def test_join_url_validates_direct_provider_spec_base_url() -> None:
 
 def test_parse_provider_response_json_rejects_html_content_type_without_body_preview() -> None:
     resp = httpx.Response(200, text="<html>sensitive-marker</html>", headers={"content-type": "text/html"})
+    raw_body = b"<html>sensitive-marker</html>"
 
     with pytest.raises(RuntimeError, match="non-JSON content-type") as exc_info:
-        _parse_provider_response_json(resp)
+        _parse_provider_response_json(resp, raw_body)
 
     assert "sensitive-marker" not in str(exc_info.value)
 
@@ -99,7 +101,24 @@ def test_parse_provider_response_json_accepts_object() -> None:
         json={"choices": [{"message": {"content": "ok"}}]},
         headers={"content-type": "application/json"},
     )
+    raw_body = b'{"choices": [{"message": {"content": "ok"}}]}'
 
-    body = _parse_provider_response_json(resp)
+    body = _parse_provider_response_json(resp, raw_body)
 
     assert body["choices"][0]["message"]["content"] == "ok"
+
+
+def test_parse_provider_response_json_rejects_non_json_body() -> None:
+    resp = httpx.Response(200, headers={"content-type": "application/json"})
+    raw_body = b"not json"
+
+    with pytest.raises(RuntimeError, match="invalid JSON"):
+        _parse_provider_response_json(resp, raw_body)
+
+
+def test_parse_provider_response_json_rejects_non_object_json() -> None:
+    resp = httpx.Response(200, headers={"content-type": "application/json"})
+    raw_body = b'"just a string"'
+
+    with pytest.raises(RuntimeError, match="must be an object"):
+        _parse_provider_response_json(resp, raw_body)
