@@ -116,7 +116,7 @@ def search_results_for(
         results = fn(query)
         return results[:max_results]
     except (httpx.HTTPError, OSError, ValueError) as exc:
-        logger.warning("Live search failed; returning no results (%s).", type(exc).__name__)
+        logger.warning("Live search failed; returning no results.", exc_info=True)
         return []
 
 
