@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -86,7 +88,10 @@ def validate_persona_version(version: str) -> str:
 
 def protect_latest_pointer(path: Path = LATEST_POINTER) -> None:
     if path.exists():
-        os.chmod(path, 0o444)
+        if sys.platform == "win32":
+            os.chmod(path, stat.S_IREAD)
+        else:
+            os.chmod(path, 0o444)
 
 
 def set_latest_persona_version(
@@ -107,7 +112,10 @@ def set_latest_persona_version(
     previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
     pointer_path.parent.mkdir(parents=True, exist_ok=True)
     if pointer_path.exists():
-        os.chmod(pointer_path, 0o666)
+        if sys.platform == "win32":
+            os.chmod(pointer_path, stat.S_IREAD | stat.S_IWRITE)
+        else:
+            os.chmod(pointer_path, 0o666)
     temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
     try:
         temp_path.write_text(f"{resolved}\n", encoding="utf-8")
