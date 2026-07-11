@@ -78,7 +78,7 @@ def _digest(rows: list[dict]) -> dict:
                 "ts": r.get("ts"),
                 "rewrite": rewrite,
                 "trace_ref": r.get("trace_ref"),
-                "preview": (r.get("reply_preview") or "")[:120],
+                "preview": str(r.get("reply_preview") or "")[:120],
             })
         chip = r.get("chip")
         if chip:
