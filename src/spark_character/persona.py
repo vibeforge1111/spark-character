@@ -104,6 +104,8 @@ def set_latest_persona_version(
     if not artifact_path.exists():
         raise FileNotFoundError(f"Persona artifact not found: persona.{resolved}.md")
 
+    # NOTE: This is a read-modify-write block. A concurrent writer could lose updates.
+    # See _atomic_read_modify_write for the safe version of this pattern.
     previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
     pointer_path.parent.mkdir(parents=True, exist_ok=True)
     if pointer_path.exists():
