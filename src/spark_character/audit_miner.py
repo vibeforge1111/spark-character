@@ -43,6 +43,30 @@ MARKDOWN_EMPHASIS_PATTERN = re.compile(
     r"(?<!\\)(?:\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|__[^_\n]+?__)"
 )
 
+
+def _tail_lines(path: Path, limit: int) -> list[str]:
+    """Read the last *limit* non-empty lines from *path* without loading
+    the entire file into memory.  Reads backwards in chunks."""
+    lines: list[str] = []
+    with open(path, "rb") as fh:
+        fh.seek(0, 2)
+        file_size = fh.tell()
+        chunk_size = 8192
+        buffer = b""
+        pos = file_size
+        while pos > 0 and len(lines) < limit:
+            read_size = min(chunk_size, pos)
+            pos -= read_size
+            fh.seek(pos)
+            buffer = fh.read(read_size) + buffer
+            decoded = buffer.decode("utf-8", errors="replace")
+            lines = [l for l in decoded.splitlines() if l.strip()]
+        # Drop the first (potentially partial) line if we stopped mid-line
+        if pos > 0 and decoded and not decoded[0] == "\n":
+            lines = lines[1:]
+    return lines[-limit:]
+
+
 DENSE_OPENING_MIN_CHARS = 135
 
 
@@ -123,7 +147,7 @@ class AuditMiner:
     ) -> AuditFindings:
         if not self.log_path.exists():
             return AuditFindings()
-        lines = self.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        lines = _tail_lines(self.log_path, limit)
         # Most recent first
         rows: list[dict[str, Any]] = []
         for raw in reversed(lines):
