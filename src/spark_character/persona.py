@@ -40,7 +40,11 @@ def load_overlay(provider_kind: str | None) -> str:
     'openai', 'ollama'. Unknown kinds return ''."""
     if not provider_kind:
         return ""
-    path = OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md"
+    path = (OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md").resolve()
+    try:
+        path.relative_to(OVERLAYS_DIR.resolve())
+    except ValueError:
+        return ""
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
@@ -52,7 +56,11 @@ def load_surface_overlay(surface: str | None) -> str:
     'tui', 'cli'. Unknown surfaces return ''."""
     if not surface:
         return ""
-    path = OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md"
+    path = (OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md").resolve()
+    try:
+        path.relative_to(OVERLAYS_DIR.resolve())
+    except ValueError:
+        return ""
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
