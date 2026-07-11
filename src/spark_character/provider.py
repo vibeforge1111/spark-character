@@ -95,6 +95,15 @@ def _parse_provider_response_json(resp: httpx.Response) -> dict[str, Any]:
     return body
 
 
+def _validate_max_tokens(value: int | None) -> int | None:
+    """Validate that max_tokens is a positive integer or None."""
+    if value is None:
+        return None
+    if not isinstance(value, int) or value <= 0:
+        raise ValueError(f"max_tokens must be a positive integer or None, got {value!r}")
+    return value
+
+
 def call_provider(
     *,
     provider: ProviderSpec,
@@ -116,6 +125,7 @@ def call_provider(
     Z.AI's `web_search`). The provider chooses when to call them; the
     final assistant text is returned to the caller.
     """
+    _validate_max_tokens(max_tokens)
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     if extra_messages:
         messages.extend(extra_messages)
@@ -153,6 +163,7 @@ async def call_provider_async(
     disable_thinking: bool = False,
     tools: list[dict[str, Any]] | None = None,
 ) -> str:
+    _validate_max_tokens(max_tokens)
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     if extra_messages:
         messages.extend(extra_messages)
