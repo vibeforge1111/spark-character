@@ -261,4 +261,5 @@ def _decode_duckduckgo_redirect(raw_url: str) -> str:
 
 
 def _strip_tags(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text)
+    cleaned = re.sub(r"<[^>]*>", "", text)
+    return html.unescape(cleaned)
