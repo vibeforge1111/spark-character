@@ -18,6 +18,7 @@ from .persona import ARTIFACTS_DIR, PersonaSpec
 from .provider import ProviderSpec, call_provider, call_provider_async
 
 DEFAULT_CRITIC_VERSION = "v1"
+# NOTE: This is a sentinel constant for test assertion, not a real credential. See tests/.
 PASS_TOKEN = "PASS"
 
 
