@@ -1,4 +1,4 @@
-"""Personality chip loader and renderer.
+ """Personality chip loader and renderer.
 
 Reads `.personality.yaml` files in the spark-personality-chip-labs schema
 and renders them to a system prompt suitable for spark-character's
@@ -343,9 +343,14 @@ def load_chip(path: str | Path) -> PersonalityChip:
         if lab_chip is None:
             raise ValueError(f"Personality chip lab failed to parse {p}")
         return _coerce_lab_chip(lab_chip)
-    import yaml  # type: ignore
-    with p.open("r", encoding="utf-8") as f:
-        spec = yaml.safe_load(f) or {}
+ import yaml  # type: ignore
+    try:
+        with p.open("r", encoding="utf-8") as f:
+            spec = yaml.safe_load(f) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Personality chip at {p} contains malformed YAML: {exc}") from exc
+    except OSError as exc:
+        raise FileNotFoundError(f"Cannot read personality chip at {p}: {exc}") from exc
     return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
 
 
