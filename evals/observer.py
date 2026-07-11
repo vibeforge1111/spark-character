@@ -43,7 +43,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-from spark_character import ProviderSpec, call_provider  # noqa: E402
+from spark_character import ProviderSpec, call_provider, validate_provider_base_url  # noqa: E402
 from spark_character.audit_miner import LLM_ROUTES, _detect_failures  # noqa: E402
 
 
@@ -285,7 +285,7 @@ def main() -> int:
         print(f"[observer] missing {p_cfg[0]} in env")
         return 2
     provider = ProviderSpec(
-        base_url=os.environ.get(p_cfg[1], p_cfg[3]),
+        base_url=validate_provider_base_url(os.environ.get(p_cfg[1], p_cfg[3])),
         model=os.environ.get(p_cfg[2], p_cfg[4]),
         api_key=api_key,
     )
