@@ -33,6 +33,10 @@ from .chip_loader import PersonalityChip
 from .provider import ProviderSpec, call_provider
 
 
+_TRAIT_FENCE_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL)
+_TRAIT_JSON_DECODER = json.JSONDecoder()
+
+
 MAX_DELTA_PER_TRAIT = 0.10
 MAX_DELTA_PER_EMOTIONAL_RANGE = 0.10
 TRAIT_FIELDS = (
@@ -174,28 +178,17 @@ def _parse_trait_response(text: str) -> dict[str, Any]:
         return {}
     raw = text.strip()
     if raw.startswith("```"):
-        match = re.search(r"```(?:json)?\s*\n(.*?)```", raw, re.DOTALL)
+        match = _TRAIT_FENCE_RE.search(raw)
         if match:
             raw = match.group(1).strip()
-    open_match = re.search(r"\{", raw)
-    if not open_match:
+    start = raw.find("{")
+    if start < 0:
         return {}
     try:
-        return json.loads(raw[open_match.start():])
-    except json.JSONDecodeError:
-        depth = 0
-        start = open_match.start()
-        for i in range(start, len(raw)):
-            if raw[i] == "{":
-                depth += 1
-            elif raw[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(raw[start:i + 1])
-                    except json.JSONDecodeError:
-                        return {}
+        parsed, _end = _TRAIT_JSON_DECODER.raw_decode(raw, start)
+    except (json.JSONDecodeError, ValueError):
         return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _clamp_dict(
@@ -286,4 +279,15 @@ def chip_to_yaml_dict(chip: PersonalityChip) -> dict[str, Any]:
     if chip.emotional_triggers:
         emo["triggers"] = dict(chip.emotional_triggers)
     base["emotional_profile"] = emo
+    preferences = dict(base.get("preferences", {}))
+    for key, value in (
+        ("communication", chip.communication),
+        ("decision_making", chip.decision_making),
+        ("likes", chip.likes),
+        ("dislikes", chip.dislikes),
+    ):
+        if value or key in preferences:
+            preferences[key] = copy.deepcopy(value)
+    if preferences:
+        base["preferences"] = preferences
     return base
