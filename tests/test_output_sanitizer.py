@@ -76,6 +76,29 @@ def test_strip_markdown_emphasis_preserves_bullets():
     assert strip_markdown_emphasis(text) == "* Lean dashboard first - ship it fast"
 
 
+def test_strip_markdown_emphasis_handles_single_character_content():
+    cases = {
+        "**x**": "x",
+        "***x***": "x",
+        "__x__": "x",
+        "Before **x** after": "Before x after",
+        "Before ***x*** after": "Before x after",
+        "Before __x__ after": "Before x after",
+    }
+    for text, expected in cases.items():
+        assert strip_markdown_emphasis(text) == expected
+
+
+def test_strip_markdown_emphasis_preserves_empty_and_unpaired_markers():
+    for text in ("****", "******", "__", "**open", "open**", "* bullet"):
+        assert strip_markdown_emphasis(text) == text
+
+
+def test_strip_markdown_emphasis_does_not_silently_skip_long_valid_content():
+    content = "x" * 10_001
+    assert strip_markdown_emphasis(f"**{content}**") == content
+
+
 def test_sanitize_removes_bold_markers():
     text = "Short answer: **yes**.\n\n**Two directions:**"
     assert sanitize_voice_output(text) == "Short answer: yes.\n\nTwo directions:"

@@ -26,6 +26,9 @@ EM_DASH_FAMILY = (
     "\u2015",  # horizontal bar
     "\u2212",  # minus sign (rare in prose, but models do emit it)
 )
+_TRIPLE_EMPHASIS_RE = re.compile(r"\*\*\*([^*\n](?:[\s\S]*?[^*\n])?)\*\*\*")
+_BOLD_EMPHASIS_RE = re.compile(r"\*\*([^*\n](?:[\s\S]*?[^*\n])?)\*\*")
+_UNDERSCORE_EMPHASIS_RE = re.compile(r"__([^_\n](?:[\s\S]*?[^_\n])?)__")
 
 
 def is_dash_punctuation(ch: str) -> bool:
@@ -80,9 +83,9 @@ def strip_markdown_emphasis(text: str) -> str:
     """Remove paired bold/italic emphasis markers while preserving bullets."""
     if not text:
         return text
-    out = re.sub(r"\*\*\*([^*\n][\s\S]*?[^*\n])\*\*\*", r"\1", text)
-    out = re.sub(r"\*\*([^*\n][\s\S]*?[^*\n])\*\*", r"\1", out)
-    out = re.sub(r"__([^_\n][\s\S]*?[^_\n])__", r"\1", out)
+    out = _TRIPLE_EMPHASIS_RE.sub(r"\1", text)
+    out = _BOLD_EMPHASIS_RE.sub(r"\1", out)
+    out = _UNDERSCORE_EMPHASIS_RE.sub(r"\1", out)
     return out
 
 
