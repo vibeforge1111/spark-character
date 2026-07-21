@@ -70,6 +70,9 @@ from .memory_grounded import (
     state_distribution,
 )
 from .registry import (
+    ChipLabNotFoundError,
+    ChipLabPromotionError,
+    PyYamlMissingError,
     find_chip_lab_path,
     promote_evolved_chip_to_chip_lab,
     promote_evolved_persona_to_chip_lab,
@@ -152,6 +155,9 @@ __all__ = [
     "chip_context_for",
     "find_chip_lab_path",
     "known_chip_keys",
+    "ChipLabNotFoundError",
+    "ChipLabPromotionError",
+    "PyYamlMissingError",
     "promote_evolved_chip_to_chip_lab",
     "promote_evolved_persona_to_chip_lab",
     "load_chip",

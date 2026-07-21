@@ -41,6 +41,19 @@ from typing import Any
 
 from .chip_loader import PersonalityChip, default_chip_lab_paths, validate_chip_yaml_spec
 
+
+class ChipLabPromotionError(Exception):
+    """Base error for an unavailable chip-lab promotion destination."""
+
+
+class PyYamlMissingError(ChipLabPromotionError):
+    """Raised when the YAML serializer is unavailable."""
+
+
+class ChipLabNotFoundError(ChipLabPromotionError):
+    """Raised when no local chip-lab personalities directory exists."""
+
+
 DEFAULT_LAB_PATH = Path(os.path.expanduser(
     "~/.spark/spark-personality-chip-labs/personalities"
 ))
@@ -73,21 +86,20 @@ def promote_evolved_persona_to_chip_lab(
     persona_markdown: str,
     composite_score: float | None = None,
     lab_path: Path | None = None,
-) -> Path | None:
+) -> Path:
     """Write a spark-character-evolved personality YAML into the chip lab.
 
-    Returns the written path if successful, or None if the chip lab is
-    not present or PyYAML is unavailable. Never raises on missing lab,
-    so the evolve loop can call this unconditionally after a promotion.
+    Returns the written path. Missing dependencies and destinations are
+    typed so callers can distinguish a skipped sidecar from bad content.
     """
     try:
         import yaml  # type: ignore
-    except ImportError:
-        return None
+    except ImportError as exc:
+        raise PyYamlMissingError("PyYAML is required for chip-lab promotion.") from exc
 
     lab = lab_path or find_chip_lab_path()
     if lab is None:
-        return None
+        raise ChipLabNotFoundError("Chip-lab personalities directory was not found.")
 
     base_yaml_path = _personality_yaml_path(lab, base_chip_id)
     base_spec: dict[str, Any] = {}
@@ -138,7 +150,7 @@ def promote_evolved_chip_to_chip_lab(
     composite_score: float | None = None,
     delta_summary: dict[str, Any] | None = None,
     lab_path: Path | None = None,
-) -> Path | None:
+) -> Path:
     """Promote a fully evolved PersonalityChip (with mutated trait values)
     back to the chip lab as a native chip yaml.
 
@@ -147,18 +159,18 @@ def promote_evolved_chip_to_chip_lab(
     function writes a real chip yaml with the new trait values, new
     emotional_range entries, and optionally a system-prompt override.
 
-    Returns the written path, or None if PyYAML isn't available or the
-    chip lab is missing locally.
+    Returns the written path. Missing dependencies and destinations raise
+    typed promotion errors.
     """
     try:
         import yaml  # type: ignore
-    except ImportError:
-        return None
+    except ImportError as exc:
+        raise PyYamlMissingError("PyYAML is required for chip-lab promotion.") from exc
     from .trait_mutator import chip_to_yaml_dict  # local import to avoid cycle
 
     lab = lab_path or find_chip_lab_path()
     if lab is None:
-        return None
+        raise ChipLabNotFoundError("Chip-lab personalities directory was not found.")
 
     spec = chip_to_yaml_dict(chip)
     new_chip_id = f"{base_chip_id}-evolved-{new_persona_version.replace('.', '-')}"

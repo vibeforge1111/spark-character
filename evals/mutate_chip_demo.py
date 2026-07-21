@@ -23,7 +23,9 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from spark_character import (  # noqa: E402
     AuditMiner,
+    ChipLabNotFoundError,
     ProviderSpec,
+    PyYamlMissingError,
     load_chip_by_id,
     mutate_trait_values,
     promote_evolved_chip_to_chip_lab,
@@ -101,23 +103,25 @@ def main() -> int:
         print("(dry-run, not promoting)")
         return 0
 
-    written = promote_evolved_chip_to_chip_lab(
-        chip=result.chip,
-        base_chip_id=args.base,
-        base_persona_version="v0",
-        new_persona_version=args.label,
-        voice_rules_override=None,
-        delta_summary={
-            "ocean": result.deltas,
-            "emotional_profile": result.emotional_profile_deltas,
-            "emotional_range": result.emotional_range_deltas,
-            "reasoning": result.reasoning,
-        },
-    )
-    if written:
+    try:
+        written = promote_evolved_chip_to_chip_lab(
+            chip=result.chip,
+            base_chip_id=args.base,
+            base_persona_version="v0",
+            new_persona_version=args.label,
+            voice_rules_override=None,
+            delta_summary={
+                "ocean": result.deltas,
+                "emotional_profile": result.emotional_profile_deltas,
+                "emotional_range": result.emotional_range_deltas,
+                "reasoning": result.reasoning,
+            },
+        )
         print(f"PROMOTED to chip lab: {written}")
-    else:
+    except ChipLabNotFoundError:
         print("Chip lab not found locally, skipped promotion")
+    except PyYamlMissingError:
+        print("PyYAML unavailable, skipped promotion")
     return 0
 
 

@@ -26,8 +26,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import os
 import re
 import sys
+import tempfile
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -53,6 +56,7 @@ from spark_character import (  # noqa: E402
     score_persona,
 )
 from spark_character.persona import ARTIFACTS_DIR, set_latest_persona_version  # noqa: E402
+from spark_character.prompt_guard import sanitize_prompt_text  # noqa: E402
 
 PROMPTS = [
     "List three things I should focus on as a founder this week.",
@@ -91,7 +95,7 @@ MUTATOR_SYSTEM = (
 )
 
 
-def _format_score_line(label: str, scores: dict, comp: float, elapsed: float | None = None) -> str:
+def _format_score_line(label: str, scores: dict, comp: float | None, elapsed: float | None = None) -> str:
     parts = [
         f"T1={scores['t1_mean']}",
         f"T2={scores['t2_mean']}",
@@ -218,12 +222,12 @@ def score_all_tiers(
                 pass
 
     return {
-        "t1_mean": round(mean_(t1_means), 3) if t1_means else 0.0,
-        "t2_mean": round(mean_(t2_scores), 3) if t2_scores else 0.0,
-        "t3_mean": round(mean_(t3_scores), 3) if t3_scores else 0.0,
-        "t6_mean": round(mean_(t6_scores), 3) if t6_scores else 0.0,
-        "t7_mean": round(mean_(t7_scores), 3) if t7_scores else 0.0,
-        "t8_mean": round(mean_(t8_scores), 3) if t8_scores else 0.0,
+        "t1_mean": round(mean_(t1_means), 3) if t1_means else None,
+        "t2_mean": round(mean_(t2_scores), 3) if t2_scores else None,
+        "t3_mean": round(mean_(t3_scores), 3) if t3_scores else None,
+        "t6_mean": round(mean_(t6_scores), 3) if t6_scores else None,
+        "t7_mean": round(mean_(t7_scores), 3) if t7_scores else None,
+        "t8_mean": round(mean_(t8_scores), 3) if t8_scores else None,
         "failures_t1": failures_t1,
         "failures_t2": failures_t2,
         "failures_t3": failures_t3,
@@ -234,12 +238,28 @@ def score_all_tiers(
     }
 
 
-def composite(scores: dict, weights: tuple[float, ...]) -> float:
+def composite(scores: dict, weights: tuple[float, ...]) -> float | None:
     """Composite fitness. weights is a 3- or 6-tuple:
-    (T1, T2, T3) or (T1, T2, T3, T6, T7, T8)."""
+    (T1, T2, T3) or (T1, T2, T3, T6, T7, T8).
+
+    A missing positively weighted tier makes the composite unavailable;
+    promotion must never improve merely because a judge or probe failed.
+    """
     w = list(weights) + [0.0] * 6
     keys = ("t1_mean", "t2_mean", "t3_mean", "t6_mean", "t7_mean", "t8_mean")
-    return round(sum(w[i] * scores.get(keys[i], 0.0) for i in range(6)), 3)
+    weighted: list[tuple[float, float]] = []
+    for index, key in enumerate(keys):
+        weight = w[index]
+        if weight <= 0:
+            continue
+        score = scores.get(key)
+        if type(score) not in (int, float) or not math.isfinite(float(score)):
+            return None
+        weighted.append((weight, float(score)))
+    total_weight = sum(weight for weight, _score in weighted)
+    if total_weight <= 0:
+        return None
+    return round(sum(weight * score for weight, score in weighted) / total_weight, 3)
 
 
 def diagnose(scores: dict) -> list[str]:
@@ -311,13 +331,37 @@ def _sanitize_mutator_output(text: str) -> str:
     if fence:
         candidate = fence.group(1).strip()
         if _FIRST_HEADING.search(candidate):
-            return candidate
+            return sanitize_prompt_text(candidate)
     # Otherwise, find the first '# Spark persona' heading and return from there
     match = _FIRST_HEADING.search(raw)
     if match:
-        return raw[match.start():].strip()
+        return sanitize_prompt_text(raw[match.start():].strip())
     # Last resort: return the raw text and let the scorer / reviewer catch it
-    return raw
+    return sanitize_prompt_text(raw)
+
+
+def _write_persona_artifact(path: Path, text: str) -> None:
+    """Persist the scored persona text without exposing a torn artifact."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            handle.write(sanitize_prompt_text(text))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 def _positive_int(value: str) -> int:
@@ -373,6 +417,8 @@ def main() -> int:
     weights = tuple(float(x) for x in args.weights.split(","))
     if len(weights) not in (3, 6):
         raise SystemExit("weights must be 3 floats (T1,T2,T3) or 6 floats (T1,T2,T3,T6,T7,T8)")
+    if any(not math.isfinite(weight) or weight < 0 for weight in weights) or sum(weights) <= 0:
+        raise SystemExit("weights must be finite, non-negative, and include at least one positive value")
 
     provider = ProviderSpec.from_env()
     n, baseline = find_latest_persona()
@@ -385,6 +431,9 @@ def main() -> int:
     baseline_scores = score_all_tiers(provider, baseline, include_deeper=args.include_deeper, chip_load=chip_load)
     baseline_composite = composite(baseline_scores, weights)
     print(_format_score_line(f"baseline v{n}", baseline_scores, baseline_composite, time.time() - t0))
+    if baseline_composite is None:
+        print("Baseline is missing at least one positively weighted tier; refusing to mutate or promote.")
+        return 2
 
     weaknesses = diagnose(baseline_scores)
 
@@ -421,7 +470,13 @@ def main() -> int:
         except Exception as exc:
             print(f"[candidate {i + 1}] ERROR: {exc}\n")
 
-    candidates.sort(key=lambda c: c["composite"], reverse=True)
+    candidates.sort(
+        key=lambda candidate: (
+            candidate["composite"] is not None,
+            candidate["composite"] if candidate["composite"] is not None else float("-inf"),
+        ),
+        reverse=True,
+    )
     print("=== verdict ===")
     print(_format_score_line(f"baseline v{n}", baseline_scores, baseline_composite))
     for c in candidates:
@@ -430,13 +485,23 @@ def main() -> int:
     winner = candidates[0] if candidates else None
     promote = False
     promote_reason = ""
-    if winner is not None and winner["composite"] > baseline_composite:
+    if (
+        winner is not None
+        and winner["composite"] is not None
+        and baseline_composite is not None
+        and winner["composite"] > baseline_composite
+    ):
         regression_axes = ["t1_mean", "t2_mean", "t3_mean"]
         if baseline_scores.get("deeper_included"):
             regression_axes.extend(["t6_mean", "t7_mean", "t8_mean"])
         regressions = []
         for axis in regression_axes:
-            drop = baseline_scores.get(axis, 0.0) - winner["scores"].get(axis, 0.0)
+            baseline_axis = baseline_scores.get(axis)
+            winner_axis = winner["scores"].get(axis)
+            if baseline_axis is None or winner_axis is None:
+                regressions.append(f"{axis}: unscored")
+                continue
+            drop = baseline_axis - winner_axis
             if drop > args.floor_drop:
                 regressions.append(f"{axis}: -{drop:.3f}")
         if regressions:
@@ -453,7 +518,7 @@ def main() -> int:
     if promote and not args.dry_run:
         new_n = n + 1
         new_path = ARTIFACTS_DIR / f"persona.v{new_n}.md"
-        new_path.write_text(winner["text"], encoding="utf-8")
+        _write_persona_artifact(new_path, winner["text"])
         set_latest_persona_version(
             f"v{new_n}",
             actor="evals/evolve_persona.py",
@@ -463,7 +528,11 @@ def main() -> int:
         print(f"  reason: {promote_reason}")
         # Sidecar promotion to spark-personality-chip-labs registry
         try:
-            from spark_character import promote_evolved_persona_to_chip_lab
+            from spark_character import (
+                ChipLabNotFoundError,
+                PyYamlMissingError,
+                promote_evolved_persona_to_chip_lab,
+            )
             chip_lab_path = promote_evolved_persona_to_chip_lab(
                 base_chip_id="founder-operator",
                 base_persona_version=f"v{n}",
@@ -471,10 +540,11 @@ def main() -> int:
                 persona_markdown=winner["text"],
                 composite_score=winner["composite"],
             )
-            if chip_lab_path is not None:
-                print(f"  registry: also wrote {chip_lab_path}")
-            else:
-                print("  registry: chip lab not found locally, skipped sidecar promotion")
+            print(f"  registry: also wrote {chip_lab_path}")
+        except PyYamlMissingError:
+            print("  registry: PyYAML unavailable, skipped sidecar promotion")
+        except ChipLabNotFoundError:
+            print("  registry: chip lab not found locally, skipped sidecar promotion")
         except Exception as exc:
             print(f"  registry: sidecar promotion failed: {exc}")
     elif promote:
