@@ -23,8 +23,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import tempfile
 import time
 from pathlib import Path
 from statistics import mean as mean_
@@ -141,6 +143,30 @@ def diagnose_weaknesses(rows: list[dict]) -> list[str]:
     return out[:8] or ["No specific failures, push for sharper warmth and brevity."]
 
 
+def _write_persona_artifact(path: Path, text: str) -> None:
+    """Atomically publish a complete persona artifact before pointer promotion."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidates", type=int, default=3)
@@ -187,7 +213,7 @@ def main() -> int:
     if promote and not args.dry_run:
         new_n = n + 1
         new_path = ARTIFACTS_DIR / f"persona.v{new_n}.md"
-        new_path.write_text(winner["text"], encoding="utf-8")
+        _write_persona_artifact(new_path, winner["text"])
         set_latest_persona_version(
             f"v{new_n}",
             actor="evals/evolve.py",

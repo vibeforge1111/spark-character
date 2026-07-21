@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +36,73 @@ def test_evolve_baseline_is_zero_when_every_prompt_fails(monkeypatch) -> None:
     assert overall == 0.0
     assert len(rows) == len(evolve.PROMPTS)
     assert all("error" in row for row in rows)
+
+
+def test_evolve_persona_artifact_write_is_atomic_and_cleans_failed_temp(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    artifact = tmp_path / "persona.v9.md"
+    artifact.write_text("old persona", encoding="utf-8")
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        assert source.parent == artifact.parent
+        assert destination == artifact
+        assert source.read_text(encoding="utf-8") == "new persona"
+        raise OSError("synthetic replace failure")
+
+    monkeypatch.setattr(evolve.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="synthetic replace failure"):
+        evolve._write_persona_artifact(artifact, "new persona")
+
+    assert artifact.read_text(encoding="utf-8") == "old persona"
+    assert list(tmp_path.glob(".persona.v9.md.*.tmp")) == []
+
+
+def test_evolve_persona_artifact_write_replaces_complete_file(tmp_path: Path) -> None:
+    artifact = tmp_path / "nested" / "persona.v9.md"
+
+    evolve._write_persona_artifact(artifact, "new persona")
+
+    assert artifact.read_text(encoding="utf-8") == "new persona"
+    assert list(artifact.parent.glob(".persona.v9.md.*.tmp")) == []
+
+
+def test_evolve_promotes_artifact_before_pointer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    events: list[tuple[str, str]] = []
+    baseline = SimpleNamespace(version="v8", system_prompt="# baseline")
+    scores = iter([(0.5, []), (0.8, [])])
+    monkeypatch.setattr(evolve.ProviderSpec, "from_env", lambda: SimpleNamespace())
+    monkeypatch.setattr(evolve, "find_latest_persona", lambda: (8, baseline))
+    monkeypatch.setattr(evolve, "baseline_score", lambda *_args: next(scores))
+    monkeypatch.setattr(evolve, "diagnose_weaknesses", lambda _rows: ["synthetic"])
+    monkeypatch.setattr(evolve, "mutate_persona", lambda *_args: "# winning persona")
+    monkeypatch.setattr(evolve, "ARTIFACTS_DIR", tmp_path)
+    monkeypatch.setattr(
+        evolve,
+        "_write_persona_artifact",
+        lambda path, text: events.append(("artifact", f"{path.name}:{text}")),
+    )
+    monkeypatch.setattr(
+        evolve,
+        "set_latest_persona_version",
+        lambda version, **_kwargs: events.append(("pointer", version)),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["evolve.py", "--candidates", "1", "--out", str(tmp_path / "result.json")],
+    )
+
+    assert evolve.main() == 0
+    assert events == [
+        ("artifact", "persona.v9.md:# winning persona"),
+        ("pointer", "v9"),
+    ]
 
 
 def test_full_pulse_counts_explicit_and_missing_scores() -> None:
