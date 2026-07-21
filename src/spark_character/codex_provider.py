@@ -15,11 +15,47 @@ those features, route through an HTTP-compatible backend.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+
+_ALLOWED_CODEX_BINARY_NAMES = frozenset({"codex", "spark-codex"})
+
+
+def _codex_binary_basename(candidate: str) -> str:
+    return str(candidate).strip().replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _codex_binary_name(candidate: str) -> str:
+    """Normalize a candidate basename across POSIX and Windows path syntax."""
+    name = _codex_binary_basename(candidate).casefold()
+    for extension in (".cmd", ".exe", ".bat"):
+        if name.endswith(extension):
+            name = name[: -len(extension)]
+            break
+    return name
+
+
+def _resolve_codex_binary(candidate: str) -> str:
+    """Resolve only Spark-owned Codex launcher names to an executable path."""
+    name = _codex_binary_name(candidate)
+    if name not in _ALLOWED_CODEX_BINARY_NAMES:
+        allowed = ", ".join(sorted(_ALLOWED_CODEX_BINARY_NAMES))
+        raise ValueError(f"Codex binary name {name or '<empty>'!r} is not allowed; expected one of: {allowed}.")
+    resolved = shutil.which(candidate)
+    if resolved is None:
+        raise FileNotFoundError(f"Allowed Codex binary {name!r} was not found or is not executable.")
+    if "/" in candidate or "\\" in candidate:
+        discovered = shutil.which(_codex_binary_basename(candidate))
+        if discovered is None or os.path.normcase(os.path.realpath(resolved)) != os.path.normcase(os.path.realpath(discovered)):
+            raise ValueError(
+                "An explicit Codex path must resolve to the same launcher discovered on PATH."
+            )
+    return resolved
 
 
 def _explicit_codex_path() -> str | None:
@@ -49,16 +85,8 @@ def _default_codex_binary() -> str:
 
 
 def validate_codex_binary(binary: str) -> None:
-    """Raise FileNotFoundError if an explicitly-configured codex path is bad.
-
-    Guards against arbitrary binary execution via a malicious/stale
-    CODEX_PATH / SPARK_CODEX_PATH env var. Only validates when the resolved
-    binary matches the explicit env path; bare PATH lookups ("codex") are
-    left for subprocess to resolve so this stays a no-op in the common case.
-    """
-    explicit = _explicit_codex_path()
-    if explicit and binary == explicit and not os.path.isfile(binary):
-        raise FileNotFoundError(f"Codex binary not found: {binary}")
+    """Compatibility wrapper validating a Codex launcher without executing it."""
+    _resolve_codex_binary(binary)
 
 
 DEFAULT_CODEX_PATH = _default_codex_binary()
@@ -93,14 +121,18 @@ def call_codex(
     prompt to the user prompt with a clear separator. Functionally
     equivalent for short conversational turns.
     """
-    # Defer the env-path validation to call time so import never crashes on a
-    # stale CODEX_PATH; this still blocks executing an explicit, non-file path.
-    validate_codex_binary(spec.binary)
+    try:
+        binary = _resolve_codex_binary(spec.binary)
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "codex binary not found. Install the Codex CLI or set CODEX_PATH / "
+            "SPARK_CODEX_PATH to its executable."
+        ) from exc
     combined = f"{system_prompt.strip()}\n\nUser message:\n{user_prompt.strip()}"
     with tempfile.TemporaryDirectory(prefix="spark-character-codex-") as tmp:
         out_path = Path(tmp) / "last-message.txt"
         cmd = [
-            spec.binary,
+            binary,
             "exec",
             "--skip-git-repo-check",
             "--model", spec.model,
@@ -138,18 +170,23 @@ def call_codex(
             # keep the return code so operators can still triage.
             raise RuntimeError(f"codex exec failed (rc={result.returncode})")
         if not out_path.exists():
-            raise RuntimeError("codex exec did not write the expected output file.")
+            raise RuntimeError(
+                "codex exec did not write the requested last-message.txt output. "
+                "Check Codex CLI compatibility and sandbox/policy settings."
+            )
         text = out_path.read_text(encoding="utf-8", errors="replace").strip()
+        if not text:
+            raise RuntimeError("codex exec produced an empty last-message output.")
         return text
 
 
 def codex_available(spec: CodexSpec | None = None) -> bool:
     s = spec or CodexSpec()
     try:
-        validate_codex_binary(s.binary)
+        binary = _resolve_codex_binary(s.binary)
         result = subprocess.run(
-            [s.binary, "--version"], capture_output=True, timeout=5
+            [binary, "--version"], capture_output=True, timeout=5
         )
         return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+    except (FileNotFoundError, ValueError, subprocess.TimeoutExpired, PermissionError):
         return False
