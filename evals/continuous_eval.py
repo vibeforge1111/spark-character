@@ -39,7 +39,9 @@ Soft-fails: any single eval error is logged and the loop continues.
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import json
+import math
 import sys
 import time
 import logging
@@ -143,24 +145,33 @@ def _append_history(history_path: Path, row: dict) -> None:
 
 
 def _load_history(history_path: Path, *, limit: int = 100) -> list[dict]:
+    """Stream the last ``limit`` valid object rows without unbounded memory."""
+    if limit <= 0:
+        return []
     if not history_path.exists():
         return []
-    rows: list[dict] = []
+    rows: deque[dict] = deque(maxlen=limit)
     with history_path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-    return rows[-limit:]
+            if isinstance(row, dict):
+                rows.append(row)
+    return list(rows)
 
 
 def _compute_baseline(history: list[dict], *, axis: str, last_n: int = 5) -> float | None:
     """Rolling mean over the last `last_n` runs that have this axis."""
-    values = [r.get(axis) for r in history[-last_n:] if isinstance(r.get(axis), (int, float))]
+    values = [
+        value
+        for row in history[-last_n:]
+        if type(value := row.get(axis)) in (int, float) and math.isfinite(float(value))
+    ]
     if not values:
         return None
     return round(mean_(values), 3)
@@ -197,77 +208,86 @@ def run_full_eval(provider: ProviderSpec, persona, *, include_sustained: bool = 
     fast = run_fast_eval(provider, persona)
 
     t3_scores: list[float] = []
+    t3_failures = 0
     for probe in PROBES:
         try:
             r = run_probe(probe, provider=provider, persona=persona)
             t3_scores.append(r.score)
         except Exception:
-            pass
+            t3_failures += 1
 
     t4_scores: list[float] = []
+    t4_failures = 0
     for scenario in STABILITY_SCENARIOS:
         try:
             r = run_stability_scenario(scenario, provider=provider, persona=persona)
             t4_scores.append(r.score)
         except Exception:
-            pass
+            t4_failures += 1
 
     t6_scores: list[float] = []
+    t6_failures = 0
     for probe in T6_EMOTIONAL_ATTUNEMENT_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t6_scores.append(r.score)
         except Exception:
-            pass
+            t6_failures += 1
 
     t7_scores: list[float] = []
+    t7_failures = 0
     for probe in T7_MEMORY_COHERENCE_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t7_scores.append(r.score)
         except Exception:
-            pass
+            t7_failures += 1
 
     t8_scores: list[float] = []
+    t8_failures = 0
     for probe in T8_INITIATIVE_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t8_scores.append(r.score)
         except Exception:
-            pass
+            t8_failures += 1
 
     t9_scores: list[float] = []
+    t9_failures = 0
     for probe in T9_AESTHETIC_FINGERPRINT_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t9_scores.append(r.score)
         except Exception:
-            pass
+            t9_failures += 1
 
     t13_scores: list[float] = []
+    t13_failures = 0
     for probe in T13_HUMANE_DEPTH_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t13_scores.append(r.score)
         except Exception:
-            pass
+            t13_failures += 1
 
     t14_scores: list[float] = []
+    t14_failures = 0
     for probe in T14_MEMORABILITY_PROBES:
         try:
             r = run_deep_probe(probe, provider=provider, persona=persona)
             t14_scores.append(r.score)
         except Exception:
-            pass
+            t14_failures += 1
 
     t11_scores: list[float] = []
+    t11_failures = 0
     if include_sustained:
         for scenario in T11_SUSTAINED_ATTACK_SCENARIOS:
             try:
                 r = run_stability_scenario(scenario, provider=provider, persona=persona)
                 t11_scores.append(r.score)
             except Exception:
-                pass
+                t11_failures += 1
 
     out = {
         **fast,
@@ -280,9 +300,20 @@ def run_full_eval(provider: ProviderSpec, persona, *, include_sustained: bool = 
         "t9_mean": round(mean_(t9_scores), 3) if t9_scores else 0.0,
         "t13_mean": round(mean_(t13_scores), 3) if t13_scores else 0.0,
         "t14_mean": round(mean_(t14_scores), 3) if t14_scores else 0.0,
+        "probe_failures": {
+            "t3": t3_failures,
+            "t4": t4_failures,
+            "t6": t6_failures,
+            "t7": t7_failures,
+            "t8": t8_failures,
+            "t9": t9_failures,
+            "t13": t13_failures,
+            "t14": t14_failures,
+        },
     }
     if include_sustained:
         out["t11_mean"] = round(mean_(t11_scores), 3) if t11_scores else 0.0
+        out["probe_failures"]["t11"] = t11_failures
     return out
 
 
@@ -302,18 +333,23 @@ def detect_regressions(history: list[dict], current: dict, *, threshold: float =
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fast-interval", type=int, default=1800)
-    parser.add_argument("--full-interval", type=int, default=21600)
+    parser.add_argument("--fast-interval", type=int, default=1800,
+                        help="Seconds between fast T1/T2 cycles; values below 60 are clamped. Default: 1800.")
+    parser.add_argument("--full-interval", type=int, default=21600,
+                        help="Seconds between full evaluation cycles. Default: 21600.")
     parser.add_argument("--once", action="store_true",
                         help="Run one fast + one full and exit. Useful for cron.")
-    parser.add_argument("--regression-threshold", type=float, default=0.10)
-    parser.add_argument("--history-file", default=str(HISTORY_FILE_DEFAULT))
-    parser.add_argument("--heartbeat-file", default=str(HEARTBEAT_FILE_DEFAULT))
+    parser.add_argument("--regression-threshold", type=float, default=0.10,
+                        help="Absolute score drop below the rolling baseline that emits REGRESSION. Default: 0.10.")
+    parser.add_argument("--history-file", default=str(HISTORY_FILE_DEFAULT),
+                        help="Append-only JSONL score-history path.")
+    parser.add_argument("--heartbeat-file", default=str(HEARTBEAT_FILE_DEFAULT),
+                        help="Epoch-and-phase heartbeat path for operator monitoring.")
     parser.add_argument(
         "--providers",
         default="zai",
         help="Comma-separated provider names to rotate through "
-        "(zai,codex,minimax,openai). Each fast/full cycle uses the "
+        "(zai,minimax,openai). Each fast/full cycle uses the "
         "next provider in the list, so cross-provider drift gets "
         "exercised continuously without a separate run.",
     )
@@ -339,9 +375,17 @@ def main() -> int:
     provider_names = [p.strip() for p in args.providers.split(",") if p.strip()]
     providers: list[tuple[str, ProviderSpec]] = []
     for name in provider_names:
+        cfg = PROVIDER_DEFAULTS.get(name.lower().strip())
+        if cfg is None:
+            print(
+                f"[continuous_eval] skipping {name!r}: unknown provider "
+                f"(known: {', '.join(sorted(PROVIDER_DEFAULTS))})",
+                flush=True,
+            )
+            continue
         spec = resolve_provider(name)
         if spec is None:
-            print(f"[continuous_eval] skipping {name!r}: API key not set in env", flush=True)
+            print(f"[continuous_eval] skipping {name!r}: {cfg['api_key_env']} is not set", flush=True)
             continue
         providers.append((name, spec))
     if not providers:
@@ -386,6 +430,8 @@ def main() -> int:
                 if run_full:
                     last_full = now
             except Exception as exc:
+                if run_full:
+                    last_full = now
                 print(f"[continuous_eval] eval error on {provider_name}: {exc}", flush=True)
                 _logger.exception("eval error on %s", provider_name)
                 _write_heartbeat(heartbeat_path, "error")
@@ -412,8 +458,17 @@ def main() -> int:
                         "llm_rows": findings.llm_rows,
                         "failures_by_kind": dict(findings.failures_by_kind),
                     }
-                except Exception:
-                    pass
+                except Exception as audit_exc:
+                    error_type = type(audit_exc).__name__
+                    row["production_audit_error"] = {
+                        "type": error_type,
+                        "message": "production audit evidence unavailable",
+                    }
+                    print(
+                        f"[continuous_eval] production_audit unavailable on {provider_name} "
+                        f"({error_type})",
+                        flush=True,
+                    )
             history = _load_history(history_path)
             # Per-provider baseline so regressions reflect drift on the
             # same backend, not noise from cross-provider differences
