@@ -50,6 +50,16 @@ def _load(history_path: Path, *, limit: int) -> list[dict]:
     return rows[-limit:]
 
 
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {parsed}")
+    return parsed
+
+
 def _arrow(current: float, previous: float, eps: float = 0.02) -> str:
     if current is None or previous is None:
         return " "
@@ -65,23 +75,21 @@ def _format_table(rows: list[dict]) -> str:
     if not rows:
         return "no rows yet"
     header_keys = ["ts", "persona", "tier"] + list(TIER_KEYS)
-    header = "{:<19} {:<22} {:<6} ".format("when", "persona", "tier") + " ".join(
+    header = "{:<23} {:<22} {:<6} ".format("when (UTC)", "persona", "tier") + " ".join(
         f"{k.replace('_mean','').upper():>5}" for k in TIER_KEYS
     )
     lines = [header]
     lines.append("-" * len(header))
     for r in rows:
         ts = r.get("ts")
-        when = (
-            time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(ts))) if ts else "?"
-        )
+        when = time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(int(ts))) if ts is not None else "?"
         persona = (r.get("persona_version") or "")[:22]
         tier = (r.get("tier") or "")[:6]
         cells = []
         for k in TIER_KEYS:
             v = r.get(k)
             cells.append(f"{v:>5}" if isinstance(v, (int, float)) else f"{'-':>5}")
-        lines.append("{:<19} {:<22} {:<6} ".format(when, persona, tier) + " ".join(cells))
+        lines.append("{:<23} {:<22} {:<6} ".format(when, persona, tier) + " ".join(cells))
     return "\n".join(lines)
 
 
@@ -89,12 +97,15 @@ def _summarize(rows: list[dict], *, compare_back: int) -> dict:
     """For each tier: latest value, mean over window, delta vs N runs back."""
     summary: dict[str, dict] = {}
     for k in TIER_KEYS:
-        values = [r.get(k) for r in rows if isinstance(r.get(k), (int, float))]
+        observations = [r.get(k) if isinstance(r.get(k), (int, float)) else None for r in rows]
+        values = [value for value in observations if value is not None]
         if not values:
             continue
-        latest = values[-1]
+        latest_index = max(index for index, value in enumerate(observations) if value is not None)
+        latest = observations[latest_index]
         window_mean = round(mean_(values), 3)
-        compared = values[-compare_back] if len(values) > compare_back else (values[0] if values else None)
+        baseline_index = latest_index - compare_back
+        compared = observations[baseline_index] if baseline_index >= 0 else None
         delta = round(latest - compared, 3) if compared is not None else None
         summary[k] = {
             "latest": latest,
@@ -108,8 +119,8 @@ def _summarize(rows: list[dict], *, compare_back: int) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--history-file", default=str(HISTORY_FILE_DEFAULT))
-    parser.add_argument("--last", type=int, default=15, help="Show this many most-recent runs")
-    parser.add_argument("--compare-back", type=int, default=10, help="Compare current to N runs back for trend")
+    parser.add_argument("--last", type=_positive_int, default=15, help="Show this many most-recent runs")
+    parser.add_argument("--compare-back", type=_positive_int, default=10, help="Compare current to N runs back for trend")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -117,10 +128,14 @@ def main() -> int:
     rows = _load(history_path, limit=args.last)
 
     if args.json:
-        print(json.dumps({
+        payload = {
             "rows": rows,
             "summary": _summarize(rows, compare_back=args.compare_back),
-        }, indent=2))
+        }
+        if getattr(sys.stdout, "isatty", lambda: False)():
+            print(json.dumps(payload, indent=2))
+        else:
+            print(json.dumps(payload, separators=(",", ":")))
         return 0
 
     if not rows:
@@ -151,7 +166,7 @@ def main() -> int:
         print(f"\n=== {len(regressions)} regression event(s) in window ===")
         for r in regressions[-5:]:
             ts = r.get("ts")
-            when = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(ts))) if ts else "?"
+            when = time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(int(ts))) if ts is not None else "?"
             print(f"\n[{when}] {r.get('persona_version')}/{r.get('tier')}")
             for line in r["regressions"]:
                 print(f"  {line}")
