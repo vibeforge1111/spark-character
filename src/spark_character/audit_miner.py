@@ -18,6 +18,8 @@ Limitations:
   because their text is hand-written and not voice-evolvable.
 
 Usage:
+    from pathlib import Path
+
     miner = AuditMiner.from_sib_home(Path.home() / ".spark" / "sib-home")
     findings = miner.recent_findings(limit=50)
     print(findings.summary())
@@ -27,6 +29,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -42,6 +45,30 @@ from .scoring import (
 MARKDOWN_EMPHASIS_PATTERN = re.compile(
     r"(?<!\\)(?:\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|__[^_\n]+?__)"
 )
+
+
+def _iter_lines_reverse(path: Path, *, chunk_size: int = 64 * 1024) -> Iterator[str]:
+    """Yield non-empty lines newest-first without loading the whole log."""
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    with path.open("rb") as handle:
+        handle.seek(0, 2)
+        position = handle.tell()
+        pending = b""
+        while position > 0:
+            read_size = min(chunk_size, position)
+            position -= read_size
+            handle.seek(position)
+            parts = (handle.read(read_size) + pending).split(b"\n")
+            pending = parts[0]
+            for raw in reversed(parts[1:]):
+                raw = raw.removesuffix(b"\r")
+                if raw:
+                    yield raw.decode("utf-8", errors="replace")
+        pending = pending.removesuffix(b"\r")
+        if pending:
+            yield pending.decode("utf-8", errors="replace")
+
 
 DENSE_OPENING_MIN_CHARS = 135
 
@@ -121,18 +148,19 @@ class AuditMiner:
         limit: int = 100,
         only_user: str | None = None,
     ) -> AuditFindings:
-        if not self.log_path.exists():
+        if limit <= 0 or not self.log_path.exists():
             return AuditFindings()
-        lines = self.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
         # Most recent first
         rows: list[dict[str, Any]] = []
-        for raw in reversed(lines):
+        for raw in _iter_lines_reverse(self.log_path):
             raw = raw.strip()
             if not raw:
                 continue
             try:
                 row = json.loads(raw)
             except json.JSONDecodeError:
+                continue
+            if not isinstance(row, dict):
                 continue
             if only_user and str(row.get("telegram_user_id") or "") != only_user:
                 continue
@@ -178,13 +206,13 @@ def _detect_failures(text: str) -> list[tuple[str, str]]:
     matches = sorted({m.lower() for m in PLUMBING_PATTERN.findall(text)})
     if matches:
         out.append(("plumbing", ",".join(matches)))
-    if RESET_PATTERN.search(text):
-        match = RESET_PATTERN.search(text)
-        out.append(("reset", match.group(0)[:60] if match else ""))
+    reset_match = RESET_PATTERN.search(text)
+    if reset_match:
+        out.append(("reset", reset_match.group(0)[:60]))
     first = _first_sentence(text)
-    if HEDGE_PATTERN.search(first):
-        match = HEDGE_PATTERN.search(first)
-        out.append(("hedge_opener", match.group(0)[:60] if match else ""))
+    hedge_match = HEDGE_PATTERN.search(first)
+    if hedge_match:
+        out.append(("hedge_opener", hedge_match.group(0)[:60]))
     return out
 
 
