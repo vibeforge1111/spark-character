@@ -118,6 +118,7 @@ from .output_sanitizer import (
 )
 from .voice_judge import (
     DistinctivenessScore,
+    VoiceCorpusUnavailable,
     score_distinctiveness,
     score_distinctiveness_async,
 )
@@ -211,6 +212,7 @@ __all__ = [
     "run_probe",
     "score_distinctiveness",
     "score_distinctiveness_async",
+    "VoiceCorpusUnavailable",
     "score_persona",
     "__version__",
 ]
