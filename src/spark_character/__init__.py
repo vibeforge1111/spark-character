@@ -1,5 +1,6 @@
 """spark-character: provider-agnostic voice and character for Spark agents."""
 
+from ._scoring_utils import JudgeScoreUnavailable
 from .audit_miner import (
     AuditFailure,
     AuditFindings,
@@ -140,6 +141,7 @@ __all__ = [
     "sanitize_voice_output",
     "strip_markdown_emphasis",
     "GenerationResult",
+    "JudgeScoreUnavailable",
     "PROBES",
     "PersonaScore",
     "PersonaSpec",
