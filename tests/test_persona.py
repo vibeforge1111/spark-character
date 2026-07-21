@@ -54,13 +54,23 @@ def test_load_critic_sanitizes_artifact_prompt_boundary(
 
 def test_latest_persona_has_chat_scanning_rules() -> None:
     persona = load_persona()
-    assert persona.version == "v8"
+    assert persona.version == "v9"
     text = persona.system_prompt
     assert "short paragraphs" in text
     assert "Avoid Markdown bold or italic emphasis" in text
     assert "Break dense answers into small chunks" in text
     assert "numbered or listed option" in text
     assert "most recent list" in text
+
+
+def test_latest_persona_preserves_command_verification_boundaries() -> None:
+    text = load_persona().system_prompt
+
+    assert "Preserve instruction boundaries around command and verification prompts" in text
+    assert "run, verify, report, or output only specific command results" in text
+    assert "Do not reinterpret a word inside that bounded block" in text
+    assert '"create"' in text
+    assert "report only the requested result" in text
 
 
 def test_persona_text_has_no_em_dash() -> None:
