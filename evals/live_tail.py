@@ -72,7 +72,7 @@ def main() -> int:
                         "fallback shapers). By default these are skipped.")
     args = parser.parse_args()
 
-    log = Path(args.sib_home) / "logs" / "gateway-outbound.jsonl"
+    log = Path(args.sib_home).expanduser() / "logs" / "gateway-outbound.jsonl"
     print(f"[live_tail] watching {log}", flush=True)
     if not log.exists():
         print(f"[live_tail] file does not exist yet, waiting...", flush=True)

@@ -151,6 +151,12 @@ def test_full_pulse_counts_missing_t2_judge_rows() -> None:
     assert full_pulse._missing_score_count(rows, expected=len(full_pulse.T1_PROMPTS), score_key="score") == len(full_pulse.T1_PROMPTS) - 1
 
 
+def test_full_pulse_docstring_matches_all_required_exit_tiers() -> None:
+    documentation = full_pulse.__doc__ or ""
+    assert "T2/T3/T4/T6/T7/T8/T9 means each >= 0.6" in documentation
+    assert "T11 mean >= 0.6 when --include-sustained is set" in documentation
+
+
 def test_live_pulse_counts_partial_prompt_coverage() -> None:
     rows = [{"score": {"mean": 1.0}}, {"error": "provider unavailable"}]
     assert live_pulse._missing_score_count(rows, expected=3, score_key="score") == 2
