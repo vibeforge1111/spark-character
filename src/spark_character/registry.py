@@ -35,6 +35,7 @@ numbers, which is a separate evolution problem.
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,33 @@ class ChipLabNotFoundError(ChipLabPromotionError):
 DEFAULT_LAB_PATH = Path(os.path.expanduser(
     "~/.spark/spark-personality-chip-labs/personalities"
 ))
+
+
+def _atomic_write_text(target: Path, content: str) -> None:
+    """Atomically replace a UTF-8 artifact without exposing partial YAML."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=target.parent,
+            prefix=f".{target.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, target)
+    except Exception:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except OSError:
+                pass
+        raise
 
 
 def find_chip_lab_path() -> Path | None:
@@ -91,6 +119,8 @@ def promote_evolved_persona_to_chip_lab(
 
     Returns the written path. Missing dependencies and destinations are
     typed so callers can distinguish a skipped sidecar from bad content.
+    Evaluation scores remain review-only even when supplied for API
+    compatibility; promotion artifacts intentionally do not persist them.
     """
     try:
         import yaml  # type: ignore
@@ -133,9 +163,9 @@ def promote_evolved_persona_to_chip_lab(
     out["voice_rules_override"] = persona_markdown.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
+    _atomic_write_text(
+        target,
         yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
     )
     return target
 
@@ -160,7 +190,8 @@ def promote_evolved_chip_to_chip_lab(
     emotional_range entries, and optionally a system-prompt override.
 
     Returns the written path. Missing dependencies and destinations raise
-    typed promotion errors.
+    typed promotion errors. Evaluation scores and mutation summaries remain
+    review-only even when supplied for API compatibility.
     """
     try:
         import yaml  # type: ignore
@@ -187,8 +218,8 @@ def promote_evolved_chip_to_chip_lab(
         spec["voice_rules_override"] = voice_rules_override.strip()
 
     target = _personality_yaml_path(lab, new_chip_id)
-    target.write_text(
+    _atomic_write_text(
+        target,
         yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
     )
     return target
