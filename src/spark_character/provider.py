@@ -10,13 +10,83 @@ response shape.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import re
+import time
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+
+
+MAX_RESPONSE_BODY_BYTES = 50 * 1024 * 1024
+MAX_PROVIDER_ATTEMPTS = 4
+RETRYABLE_PROVIDER_STATUS_CODES = frozenset({429})
+RETRYABLE_PROVIDER_EXCEPTIONS = (httpx.ConnectError, httpx.ConnectTimeout)
+
+
+class ResponseBodyTooLarge(RuntimeError):
+    """Raised when a provider response exceeds the bounded body size."""
+
+
+def _check_content_length(resp: httpx.Response) -> None:
+    content_length = resp.headers.get("content-length")
+    if content_length is None:
+        return
+    try:
+        length = int(content_length)
+    except ValueError:
+        return
+    if length > MAX_RESPONSE_BODY_BYTES:
+        raise ResponseBodyTooLarge(
+            f"Provider response Content-Length {length} bytes exceeds "
+            f"the {MAX_RESPONSE_BODY_BYTES}-byte limit."
+        )
+
+
+def _read_stream_body(resp: httpx.Response) -> bytes:
+    """Read a provider stream while enforcing its decoded body-size limit."""
+    _check_content_length(resp)
+    chunks: list[bytes] = []
+    total = 0
+    for chunk in resp.iter_bytes(chunk_size=64 * 1024):
+        total += len(chunk)
+        if total > MAX_RESPONSE_BODY_BYTES:
+            raise ResponseBodyTooLarge(
+                f"Provider response body exceeded the {MAX_RESPONSE_BODY_BYTES}-byte limit."
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _read_stream_body_async(resp: httpx.Response) -> bytes:
+    """Async variant of :func:`_read_stream_body`."""
+    _check_content_length(resp)
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in resp.aiter_bytes(chunk_size=64 * 1024):
+        total += len(chunk)
+        if total > MAX_RESPONSE_BODY_BYTES:
+            raise ResponseBodyTooLarge(
+                f"Provider response body exceeded the {MAX_RESPONSE_BODY_BYTES}-byte limit."
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _retry_delay_seconds(attempt: int, resp: httpx.Response | None = None) -> float:
+    """Return bounded backoff, honoring a numeric Retry-After when present."""
+    if resp is not None:
+        retry_after = resp.headers.get("retry-after")
+        if retry_after is not None:
+            try:
+                return min(max(float(retry_after), 0.0), 60.0)
+            except ValueError:
+                pass
+    return float(min(2**attempt, 8))
 
 
 ALLOWED_PROVIDER_HOSTS = frozenset(
@@ -41,6 +111,11 @@ class ProviderSpec:
     api_key: str
     timeout_seconds: float = 60.0
 
+    @staticmethod
+    def _env_or_default(env_name: str, default: str) -> str:
+        value = (os.environ.get(env_name) or "").strip()
+        return value or default
+
     @classmethod
     def from_env(
         cls,
@@ -51,14 +126,14 @@ class ProviderSpec:
         default_base_url: str = "https://api.z.ai/api/coding/paas/v4/",
         default_model: str = "glm-5.1",
     ) -> "ProviderSpec":
-        api_key = os.environ.get(api_key_env)
+        api_key = (os.environ.get(api_key_env) or "").strip()
         if not api_key:
             raise RuntimeError(
                 f"Missing API key: env var {api_key_env} is not set."
             )
         return cls(
-            base_url=validate_provider_base_url(os.environ.get(base_url_env, default_base_url)),
-            model=os.environ.get(model_env, default_model),
+            base_url=validate_provider_base_url(cls._env_or_default(base_url_env, default_base_url)),
+            model=cls._env_or_default(model_env, default_model),
             api_key=api_key,
         )
 
@@ -79,7 +154,10 @@ def _join_url(base_url: str, path_name: str) -> str:
     return f"{safe_base_url.rstrip('/')}/{path_name.lstrip('/')}"
 
 
-def _parse_provider_response_json(resp: httpx.Response) -> dict[str, Any]:
+def _parse_provider_response_json(
+    resp: httpx.Response,
+    raw_body: bytes | None = None,
+) -> dict[str, Any]:
     """Parse provider JSON without leaking raw provider bodies in errors."""
     content_type = (resp.headers.get("content-type") or "").lower()
     if content_type and "json" not in content_type:
@@ -87,7 +165,13 @@ def _parse_provider_response_json(resp: httpx.Response) -> dict[str, Any]:
             f"Provider returned non-JSON content-type (status {resp.status_code}): {content_type}"
         )
     try:
-        body = resp.json()
+        if raw_body is None:
+            raw_body = resp.content
+            if len(raw_body) > MAX_RESPONSE_BODY_BYTES:
+                raise ResponseBodyTooLarge(
+                    f"Provider response body exceeded the {MAX_RESPONSE_BODY_BYTES}-byte limit."
+                )
+        body = json.loads(raw_body)
     except ValueError as exc:
         raise RuntimeError(f"Provider returned invalid JSON (status {resp.status_code}).") from exc
     if not isinstance(body, dict):
@@ -136,10 +220,26 @@ def call_provider(
     }
     url = _join_url(provider.base_url, "chat/completions")
     with httpx.Client(timeout=provider.timeout_seconds) as client:
-        resp = client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        body = _parse_provider_response_json(resp)
-    return _extract_text(body)
+        for attempt in range(MAX_PROVIDER_ATTEMPTS):
+            retry_delay: float | None = None
+            try:
+                with client.stream("POST", url, json=payload, headers=headers) as resp:
+                    if (
+                        resp.status_code in RETRYABLE_PROVIDER_STATUS_CODES
+                        and attempt + 1 < MAX_PROVIDER_ATTEMPTS
+                    ):
+                        retry_delay = _retry_delay_seconds(attempt, resp)
+                    else:
+                        resp.raise_for_status()
+                        body = _parse_provider_response_json(resp, _read_stream_body(resp))
+                        return _extract_text(body)
+            except RETRYABLE_PROVIDER_EXCEPTIONS:
+                if attempt + 1 >= MAX_PROVIDER_ATTEMPTS:
+                    raise
+                retry_delay = _retry_delay_seconds(attempt)
+            if retry_delay is not None:
+                time.sleep(retry_delay)
+    raise RuntimeError("Provider retry loop ended without a response.")
 
 
 async def call_provider_async(
@@ -173,10 +273,27 @@ async def call_provider_async(
     }
     url = _join_url(provider.base_url, "chat/completions")
     async with httpx.AsyncClient(timeout=provider.timeout_seconds) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        body = _parse_provider_response_json(resp)
-    return _extract_text(body)
+        for attempt in range(MAX_PROVIDER_ATTEMPTS):
+            retry_delay: float | None = None
+            try:
+                async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                    if (
+                        resp.status_code in RETRYABLE_PROVIDER_STATUS_CODES
+                        and attempt + 1 < MAX_PROVIDER_ATTEMPTS
+                    ):
+                        retry_delay = _retry_delay_seconds(attempt, resp)
+                    else:
+                        resp.raise_for_status()
+                        raw_body = await _read_stream_body_async(resp)
+                        body = _parse_provider_response_json(resp, raw_body)
+                        return _extract_text(body)
+            except RETRYABLE_PROVIDER_EXCEPTIONS:
+                if attempt + 1 >= MAX_PROVIDER_ATTEMPTS:
+                    raise
+                retry_delay = _retry_delay_seconds(attempt)
+            if retry_delay is not None:
+                await asyncio.sleep(retry_delay)
+    raise RuntimeError("Provider retry loop ended without a response.")
 
 
 _THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think\s*>", re.IGNORECASE | re.DOTALL)
