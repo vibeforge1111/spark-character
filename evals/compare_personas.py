@@ -99,37 +99,43 @@ def score(
 
     t1_scores: list[float] = []
     t2_scores: list[float] = []
+    score_error_counts = {tier: 0 for tier in ("generate", "t2", "t3", "t6", "t7", "t8")}
     for prompt in PROMPTS:
         try:
             r = generate(prompt, provider=provider, persona=persona, max_tokens=max_tokens)
             t1_scores.append(score_persona(r.final).mean)
             try:
                 t2_scores.append(score_distinctiveness(r.final, provider=provider).score)
-            except Exception:
-                pass
+            except Exception as exc:
+                score_error_counts["t2"] += 1
+                log(f"  T2 scoring failed ({type(exc).__name__})")
         except Exception as exc:
-            log(f"  generate error on {prompt[:40]!r}: {exc}")
+            score_error_counts["generate"] += 1
+            log(f"  generation failed ({type(exc).__name__})")
 
     t3_scores: list[float] = []
     for probe in PROBES:
         try:
             t3_scores.append(run_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens).score)
-        except Exception:
-            pass
+        except Exception as exc:
+            score_error_counts["t3"] += 1
+            log(f"  T3 probe failed ({type(exc).__name__})")
 
     t6_scores: list[float] = []
     for probe in T6_EMOTIONAL_ATTUNEMENT_PROBES:
         try:
             t6_scores.append(run_deep_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens).score)
-        except Exception:
-            pass
+        except Exception as exc:
+            score_error_counts["t6"] += 1
+            log(f"  T6 probe failed ({type(exc).__name__})")
 
     t7_scores: list[float] = []
     for probe in T7_MEMORY_COHERENCE_PROBES:
         try:
             t7_scores.append(run_deep_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens).score)
-        except Exception:
-            pass
+        except Exception as exc:
+            score_error_counts["t7"] += 1
+            log(f"  T7 probe failed ({type(exc).__name__})")
 
     t8_scores: list[float] = []
     t8_per_probe: list[tuple[str, float]] = []
@@ -138,8 +144,9 @@ def score(
             r = run_deep_probe(probe, provider=provider, persona=persona, max_tokens=max_tokens)
             t8_scores.append(r.score)
             t8_per_probe.append((probe.id, r.score))
-        except Exception:
-            pass
+        except Exception as exc:
+            score_error_counts["t8"] += 1
+            log(f"  T8 probe failed ({type(exc).__name__})")
 
     scores = {
         "t1": t1_scores,
@@ -154,6 +161,7 @@ def score(
         **{tier: round(mean_(values), 3) if values else None for tier, values in scores.items()},
         "t8_per_probe": t8_per_probe,
         "score_counts": {tier: len(values) for tier, values in scores.items()},
+        "score_error_counts": score_error_counts,
     }
 
 

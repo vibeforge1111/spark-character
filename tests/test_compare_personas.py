@@ -56,10 +56,15 @@ def test_missing_tiers_are_none_with_explicit_counts(monkeypatch, tmp_path: Path
     monkeypatch.setattr(compare, "generate", fail)
     monkeypatch.setattr(compare, "run_probe", fail)
     monkeypatch.setattr(compare, "run_deep_probe", fail)
-    row = compare.score("v1", SimpleNamespace(), max_tokens=10, log=lambda _message: None)
+    logs: list[str] = []
+    row = compare.score("v1", SimpleNamespace(), max_tokens=10, log=logs.append)
 
     assert all(row[tier] is None for tier in ("t1", "t2", "t3", "t6", "t7", "t8"))
     assert row["score_counts"] == {"t1": 0, "t2": 0, "t3": 0, "t6": 0, "t7": 0, "t8": 0}
+    assert row["score_error_counts"]["generate"] == len(compare.PROMPTS)
+    assert row["score_error_counts"]["t3"] == len(compare.PROBES)
+    assert any("generation failed (RuntimeError)" in message for message in logs)
+    assert all("provider unavailable" not in message for message in logs)
     assert compare.composite(row, (0.2, 0.3, 0.2, 0.1, 0.1, 0.1)) is None
 
 

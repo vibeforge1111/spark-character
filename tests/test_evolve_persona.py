@@ -26,7 +26,7 @@ def test_composite_requires_every_positively_weighted_tier() -> None:
     assert evolve_persona.composite({**scores, "t2_mean": None}, (0.5, 0.0, 0.5)) == 0.6
 
 
-def test_unscored_tiers_are_none_instead_of_false_zero(monkeypatch) -> None:
+def test_unscored_tiers_are_none_instead_of_false_zero(monkeypatch, caplog) -> None:
     monkeypatch.setattr(evolve_persona, "PROMPTS", ["synthetic prompt"])
     monkeypatch.setattr(evolve_persona, "PROBES", [SimpleNamespace(id="t3")])
 
@@ -36,11 +36,23 @@ def test_unscored_tiers_are_none_instead_of_false_zero(monkeypatch) -> None:
     monkeypatch.setattr(evolve_persona, "generate", fail)
     monkeypatch.setattr(evolve_persona, "run_probe", fail)
 
-    result = evolve_persona.score_all_tiers(SimpleNamespace(), SimpleNamespace(), include_deeper=False)
+    with caplog.at_level("WARNING"):
+        result = evolve_persona.score_all_tiers(SimpleNamespace(), SimpleNamespace(), include_deeper=False)
 
     assert result["t1_mean"] is None
     assert result["t2_mean"] is None
     assert result["t3_mean"] is None
+    assert result["score_error_counts"] == {
+        "generate": 1,
+        "t2": 0,
+        "t3": 1,
+        "t6": 0,
+        "t7": 0,
+        "t8": 0,
+    }
+    assert "T1 generation failed (RuntimeError)" in caplog.text
+    assert "T3 probe failed (RuntimeError)" in caplog.text
+    assert "synthetic scoring failure" not in caplog.text
 
 
 def test_mutator_output_is_sanitized_before_scoring() -> None:

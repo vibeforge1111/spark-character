@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import os
 import re
@@ -57,6 +58,8 @@ from spark_character import (  # noqa: E402
 )
 from spark_character.persona import ARTIFACTS_DIR, set_latest_persona_version  # noqa: E402
 from spark_character.prompt_guard import sanitize_prompt_text  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 PROMPTS = [
     "List three things I should focus on as a founder this week.",
@@ -160,6 +163,7 @@ def score_all_tiers(
     failures_t6: list[tuple[str, float]] = []
     failures_t7: list[tuple[str, float]] = []
     failures_t8: list[tuple[str, float]] = []
+    score_error_counts = {tier: 0 for tier in ("generate", "t2", "t3", "t6", "t7", "t8")}
 
     chip_keys = list(chip_load or [])
     for prompt in PROMPTS:
@@ -181,10 +185,12 @@ def score_all_tiers(
                 t2_scores.append(t2.score)
                 if t2.score < 0.7:
                     failures_t2.append((prompt, t2.score, result.final[:200]))
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except Exception as exc:
+                score_error_counts["t2"] += 1
+                logger.warning("T2 scoring failed (%s)", type(exc).__name__)
+        except Exception as exc:
+            score_error_counts["generate"] += 1
+            logger.warning("T1 generation failed (%s)", type(exc).__name__)
 
     for probe in PROBES:
         try:
@@ -192,8 +198,9 @@ def score_all_tiers(
             t3_scores.append(r.score)
             if r.score < 0.8:
                 failures_t3.append((probe.id, r.score))
-        except Exception:
-            pass
+        except Exception as exc:
+            score_error_counts["t3"] += 1
+            logger.warning("T3 probe failed (%s)", type(exc).__name__)
 
     if include_deeper:
         for probe in T6_EMOTIONAL_ATTUNEMENT_PROBES:
@@ -202,24 +209,27 @@ def score_all_tiers(
                 t6_scores.append(r.score)
                 if r.score < 0.8:
                     failures_t6.append((probe.id, r.score))
-            except Exception:
-                pass
+            except Exception as exc:
+                score_error_counts["t6"] += 1
+                logger.warning("T6 probe failed (%s)", type(exc).__name__)
         for probe in T7_MEMORY_COHERENCE_PROBES:
             try:
                 r = run_deep_probe(probe, provider=provider, persona=persona)
                 t7_scores.append(r.score)
                 if r.score < 0.8:
                     failures_t7.append((probe.id, r.score))
-            except Exception:
-                pass
+            except Exception as exc:
+                score_error_counts["t7"] += 1
+                logger.warning("T7 probe failed (%s)", type(exc).__name__)
         for probe in T8_INITIATIVE_PROBES:
             try:
                 r = run_deep_probe(probe, provider=provider, persona=persona)
                 t8_scores.append(r.score)
                 if r.score < 0.8:
                     failures_t8.append((probe.id, r.score))
-            except Exception:
-                pass
+            except Exception as exc:
+                score_error_counts["t8"] += 1
+                logger.warning("T8 probe failed (%s)", type(exc).__name__)
 
     return {
         "t1_mean": round(mean_(t1_means), 3) if t1_means else None,
@@ -234,6 +244,7 @@ def score_all_tiers(
         "failures_t6": failures_t6,
         "failures_t7": failures_t7,
         "failures_t8": failures_t8,
+        "score_error_counts": score_error_counts,
         "deeper_included": bool(include_deeper),
     }
 
