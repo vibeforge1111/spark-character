@@ -9,6 +9,8 @@ INVISIBLE_UNICODE_CHARS = {
     "\u200b": "ZERO WIDTH SPACE",
     "\u200c": "ZERO WIDTH NON-JOINER",
     "\u200d": "ZERO WIDTH JOINER",
+    "\u200e": "LEFT-TO-RIGHT MARK",
+    "\u200f": "RIGHT-TO-LEFT MARK",
     "\u2060": "WORD JOINER",
     "\ufeff": "BYTE ORDER MARK",
     "\u202a": "LEFT-TO-RIGHT EMBEDDING",
@@ -16,7 +18,23 @@ INVISIBLE_UNICODE_CHARS = {
     "\u202c": "POP DIRECTIONAL FORMATTING",
     "\u202d": "LEFT-TO-RIGHT OVERRIDE",
     "\u202e": "RIGHT-TO-LEFT OVERRIDE",
+    "\u2028": "LINE SEPARATOR",
+    "\u2029": "PARAGRAPH SEPARATOR",
+    "\u2066": "LEFT-TO-RIGHT ISOLATE",
+    "\u2067": "RIGHT-TO-LEFT ISOLATE",
+    "\u2068": "FIRST STRONG ISOLATE",
+    "\u2069": "POP DIRECTIONAL ISOLATE",
+    "\u00ad": "SOFT HYPHEN",
+    "\u034f": "COMBINING GRAPHEME JOINER",
+    "\u2061": "FUNCTION APPLICATION",
+    "\u2062": "INVISIBLE TIMES",
+    "\u2063": "INVISIBLE SEPARATOR",
+    "\u2064": "INVISIBLE PLUS",
 }
+INVISIBLE_UNICODE_CHARS.update(
+    {chr(codepoint): "UNICODE TAG" for codepoint in range(0xE0000, 0xE0080)}
+)
+LINE_SEPARATOR_CHARS = ("\u2028", "\u2029")
 PROMPT_BOUNDARY_PREFIX = r"(?:^|[:\-]\s*)"
 STORED_PROMPT_INJECTION_PATTERNS = (
     (
@@ -50,8 +68,9 @@ def scan_invisible_unicode(text: str) -> list[PromptGuardFinding]:
 
 def scan_stored_prompt_injection(text: str) -> list[PromptGuardFinding]:
     findings: list[PromptGuardFinding] = []
+    normalized = _normalize_line_separators(text)
     for category, pattern in STORED_PROMPT_INJECTION_PATTERNS:
-        if pattern.search(text):
+        if pattern.search(normalized):
             findings.append(PromptGuardFinding(category, "prompt text matched a stored-injection pattern"))
     return findings
 
@@ -63,7 +82,12 @@ def scan_prompt_text(text: str) -> list[PromptGuardFinding]:
 def sanitize_prompt_text(text: str) -> str:
     if not text:
         return text
-    sanitized = text
+    separator_markers = [
+        _invisible_marker(char, INVISIBLE_UNICODE_CHARS[char])
+        for char in LINE_SEPARATOR_CHARS
+        if char in text
+    ]
+    sanitized = _normalize_line_separators(text)
     for char, name in INVISIBLE_UNICODE_CHARS.items():
         sanitized = sanitized.replace(char, _invisible_marker(char, name))
     output_lines: list[str] = []
@@ -78,7 +102,15 @@ def sanitize_prompt_text(text: str) -> str:
             output_lines.extend(_line_invisible_markers(line))
         else:
             output_lines.append(line)
+    output_lines.extend(separator_markers)
     return "\n".join(output_lines)
+
+
+def _normalize_line_separators(text: str) -> str:
+    """Keep Unicode pseudo-lines inside the same prompt-guard boundary."""
+    for separator in LINE_SEPARATOR_CHARS:
+        text = text.replace(separator, " ")
+    return text
 
 
 def _invisible_marker(char: str, name: str) -> str:
