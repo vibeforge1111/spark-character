@@ -126,7 +126,7 @@ def generate_with_critique(
             draft=draft,
             rewritten=False,
             persona_version=p.version,
-            critic_version=c.version,
+            critic_version=None,
         )
     result: CritiqueResult = critique(
         provider=provider, persona=p, critic=c, draft=draft, max_tokens=max_tokens
@@ -199,7 +199,7 @@ async def generate_with_critique_async(
             draft=draft,
             rewritten=False,
             persona_version=p.version,
-            critic_version=c.version,
+            critic_version=None,
         )
     result: CritiqueResult = await critique_async(
         provider=provider, persona=p, critic=c, draft=draft, max_tokens=max_tokens
