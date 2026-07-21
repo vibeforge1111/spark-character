@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -103,6 +104,41 @@ def test_evolve_promotes_artifact_before_pointer(
         ("artifact", "persona.v9.md:# winning persona"),
         ("pointer", "v9"),
     ]
+
+
+def test_evolve_preserves_candidate_failure_summary_in_new_output_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = SimpleNamespace(version="v8", system_prompt="# baseline")
+    attempts = iter([RuntimeError("secret provider detail"), "# candidate two"])
+    scores = iter([(0.5, []), (0.4, [])])
+    monkeypatch.setattr(evolve.ProviderSpec, "from_env", lambda: SimpleNamespace())
+    monkeypatch.setattr(evolve, "find_latest_persona", lambda: (8, baseline))
+    monkeypatch.setattr(evolve, "baseline_score", lambda *_args: next(scores))
+    monkeypatch.setattr(evolve, "diagnose_weaknesses", lambda _rows: ["synthetic"])
+
+    def mutate(*_args):
+        result = next(attempts)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(evolve, "mutate_persona", mutate)
+    output = tmp_path / "missing" / "nested" / "result.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["evolve.py", "--candidates", "2", "--dry-run", "--out", str(output)],
+    )
+
+    assert evolve.main() == 0
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["candidate_attempts"] == 2
+    assert payload["candidate_error_count"] == 1
+    assert payload["candidate_errors"] == [{"index": 1, "error_type": "RuntimeError"}]
+    assert "secret provider detail" not in output.read_text(encoding="utf-8")
 
 
 def test_full_pulse_counts_explicit_and_missing_scores() -> None:
