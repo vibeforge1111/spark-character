@@ -100,7 +100,8 @@ def baseline_score(provider: ProviderSpec, persona: PersonaSpec) -> tuple[float,
                 means_per_axis[k].append(getattr(score, k))
         except Exception as exc:
             rows.append({"prompt": prompt, "error": str(exc)})
-    overall = round(mean_([mean_(v) for v in means_per_axis.values() if v]), 3)
+    means = [mean_(values) for values in means_per_axis.values() if values]
+    overall = round(mean_(means), 3) if means else 0.0
     return overall, rows
 
 

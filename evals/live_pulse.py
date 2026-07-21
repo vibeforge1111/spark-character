@@ -58,6 +58,12 @@ PROMPTS = [
 ]
 
 
+def _missing_score_count(rows: list[dict], *, expected: int, score_key: str) -> int:
+    """Count failed and absent prompts so partial means cannot pass."""
+    scored = sum(1 for row in rows if score_key in row)
+    return max(0, expected - scored)
+
+
 def _positive_int(value: str) -> int:
     try:
         parsed = int(value)
@@ -145,14 +151,18 @@ def main() -> int:
         for c in cols:
             means[c] = round(means[c] / counted, 3)
     overall_mean = round(sum(means.values()) / max(1, len(cols)), 3)
+    error_count = _missing_score_count(rows, expected=len(PROMPTS), score_key="score")
     print(f"\nMEANS: {means}")
     print(f"OVERALL: {overall_mean}")
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({"rows": rows, "means": means, "overall": overall_mean}, indent=2))
+    out_path.write_text(json.dumps({"rows": rows, "means": means, "overall": overall_mean, "coverage_error_count": error_count}, indent=2))
     print(f"\nFull transcript: {out_path}")
 
+    if error_count:
+        print(f"ERRORS: {error_count}/{len(PROMPTS)} prompt(s) failed or are missing; gating non-zero regardless of mean.")
+        return 1
     return 0 if overall_mean >= 0.9 else 1
 
 

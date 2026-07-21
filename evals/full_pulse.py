@@ -49,6 +49,12 @@ T1_PROMPTS = [
 ]
 
 
+def _missing_score_count(rows: list[dict], *, expected: int, score_key: str) -> int:
+    """Count failed and absent evaluations without letting partial means pass."""
+    scored = sum(1 for row in rows if score_key in row)
+    return max(0, expected - scored)
+
+
 def _positive_int(value: str) -> int:
     try:
         parsed = int(value)
@@ -97,6 +103,7 @@ def main() -> int:
             t2 = score_distinctiveness(result.final, provider=provider)
         except Exception as exc:
             print(f"[{label}] T2 judge error: {exc}")
+            t2_rows.append({"label": label, "error": str(exc)})
             t2 = None
         dt = time() - t0
         first_line = (result.final.splitlines() or [""])[0][:90]
@@ -321,6 +328,23 @@ def main() -> int:
             if "score" in r:
                 print(f"  {r['scenario_id']:<32} trait={r['trait']:<40} score={r['score']:.2f}")
 
+    coverage_errors = {
+        "t1": _missing_score_count(t1_rows, expected=len(T1_PROMPTS), score_key="t1_mean"),
+        "t2": _missing_score_count(t2_rows, expected=len(T1_PROMPTS), score_key="score"),
+        "t3": _missing_score_count(t3_rows, expected=len(PROBES), score_key="score"),
+        "t4": _missing_score_count(t4_rows, expected=len(STABILITY_SCENARIOS), score_key="score"),
+        "t6": _missing_score_count(t6_rows, expected=len(T6_EMOTIONAL_ATTUNEMENT_PROBES), score_key="score"),
+        "t7": _missing_score_count(t7_rows, expected=len(T7_MEMORY_COHERENCE_PROBES), score_key="score"),
+        "t8": _missing_score_count(t8_rows, expected=len(T8_INITIATIVE_PROBES), score_key="score"),
+        "t9": _missing_score_count(t9_rows, expected=len(T9_AESTHETIC_FINGERPRINT_PROBES), score_key="score"),
+        "t11": _missing_score_count(
+            t11_rows,
+            expected=len(T11_SUSTAINED_ATTACK_SCENARIOS) if args.include_sustained else 0,
+            score_key="score",
+        ),
+    }
+    error_count = sum(coverage_errors.values())
+
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps({
         "persona_version": persona.version,
@@ -343,8 +367,13 @@ def main() -> int:
         "t8_mean": t8_mean,
         "t9_mean": t9_mean,
         "t11_mean": t11_mean,
+        "coverage_errors": coverage_errors,
+        "coverage_error_count": error_count,
     }, indent=2))
     print(f"\nFull transcript: {args.out}")
+    if error_count:
+        print(f"ERRORS: {error_count} required evaluation(s) failed or are missing; gating non-zero regardless of mean.")
+        return 1
     base_pass = (
         t1_mean >= 0.95
         and t2_mean >= 0.6
