@@ -37,6 +37,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,7 @@ from .prompt_guard import sanitize_prompt_text
 
 
 logger = logging.getLogger(__name__)
+CHIP_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 
 try:  # optional dependency
     from personality_engine.loader import load_personality as _lab_load_personality  # type: ignore
@@ -344,8 +346,13 @@ def load_chip(path: str | Path) -> PersonalityChip:
             raise ValueError(f"Personality chip lab failed to parse {p}")
         return _coerce_lab_chip(lab_chip)
     import yaml  # type: ignore
-    with p.open("r", encoding="utf-8") as f:
-        spec = yaml.safe_load(f) or {}
+    try:
+        with p.open("r", encoding="utf-8-sig") as f:
+            spec = yaml.safe_load(f) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Personality chip file is invalid YAML: {p.name}") from exc
+    except OSError as exc:
+        raise OSError(f"Personality chip file cannot be read: {p.name}") from exc
     return _coerce_yaml_dict(validate_chip_yaml_spec(spec))
 
 
@@ -354,8 +361,22 @@ def _safe_chip_id(value: str) -> str:
     if not chip_id:
         raise ValueError("Personality chip id is required.")
     if "/" in chip_id or "\\" in chip_id:
-        raise ValueError(f"Personality chip id must not contain path separators: {chip_id!r}")
+        raise ValueError("Personality chip id must not contain path separators.")
+    if ".." in chip_id or not CHIP_ID_PATTERN.fullmatch(chip_id):
+        raise ValueError("Personality chip id must be a bounded identifier.")
     return chip_id
+
+
+def _owned_chip_path(base: Path, candidate: Path) -> Path | None:
+    """Resolve an existing chip only when it remains inside its search root."""
+    try:
+        root = base.resolve(strict=True)
+        resolved = candidate.resolve(strict=True)
+    except OSError:
+        return None
+    if not resolved.is_file() or not resolved.is_relative_to(root):
+        return None
+    return resolved
 
 
 def load_chip_by_id(
@@ -373,14 +394,18 @@ def load_chip_by_id(
         if not base.exists():
             continue
         candidate = base / f"{safe_chip_id}.personality.yaml"
-        if candidate.exists():
+        owned_candidate = _owned_chip_path(base, candidate)
+        if owned_candidate is not None:
             try:
-                return load_chip(candidate)
+                return load_chip(owned_candidate)
             except recoverable_load_errors as exc:
                 raise ValueError(f"Personality chip file is invalid: {candidate.name}") from exc
         for entry in sorted(base.glob("*.personality.yaml")):
+            owned_entry = _owned_chip_path(base, entry)
+            if owned_entry is None:
+                continue
             try:
-                chip = load_chip(entry)
+                chip = load_chip(owned_entry)
             except recoverable_load_errors as exc:
                 logger.warning("Failed to load personality chip %s: %s", entry.name, exc)
                 continue
@@ -476,6 +501,8 @@ def render_chip_to_system_prompt(chip: PersonalityChip) -> str:
                 expr = str(s.get("expression") or "").strip()
                 if desc:
                     lines.append(f"- {desc}{(' (' + expr + ')') if expr else ''}")
+            elif isinstance(s, str) and s.strip():
+                lines.append(f"- {s.strip()}")
 
     # Vulnerabilities
     if chip.vulnerabilities:
@@ -490,6 +517,8 @@ def render_chip_to_system_prompt(chip: PersonalityChip) -> str:
                     if mit:
                         line += f" Mitigation: {mit}"
                     lines.append(line)
+            elif isinstance(v, str) and v.strip():
+                lines.append(f"- {v.strip()}")
 
     # Hard universal rules from spark-character
     lines.append("")
