@@ -92,6 +92,15 @@ WARM_MARKERS = (
 )
 WARM_PATTERN = re.compile("|".join(WARM_MARKERS), re.IGNORECASE)
 
+_SENTENCE_BOUNDARY_PATTERN = re.compile(r"[.!?](?=\s|$)")
+_SENTENCE_ABBREVIATIONS = frozenset(
+    {"dr", "jr", "mr", "mrs", "ms", "prof", "sr", "st", "vs"}
+)
+_DOTTED_ABBREVIATION_PATTERN = re.compile(r"(?:\b[A-Za-z]\.){2,}$")
+_CJK_CHARACTER_PATTERN = re.compile(
+    r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]"
+)
+
 
 @dataclass(frozen=True)
 class PersonaScore:
@@ -140,8 +149,16 @@ def _first_sentence(text: str) -> str:
     stripped = text.strip()
     if not stripped:
         return ""
-    parts = re.split(r"(?<=[.!?])\s+", stripped, maxsplit=1)
-    return parts[0] if parts else stripped
+    for boundary in _SENTENCE_BOUNDARY_PATTERN.finditer(stripped):
+        candidate = stripped[: boundary.end()]
+        if boundary.group() == ".":
+            token = re.search(r"([A-Za-z]+)\.$", candidate)
+            if token and token.group(1).lower() in _SENTENCE_ABBREVIATIONS:
+                continue
+            if _DOTTED_ABBREVIATION_PATTERN.search(candidate):
+                continue
+        return candidate
+    return stripped
 
 
 def _voice_score(text: str) -> tuple[float, str]:
@@ -149,7 +166,9 @@ def _voice_score(text: str) -> tuple[float, str]:
         return 0.0, "empty"
     robotic_hits = ROBOTIC_PATTERN.findall(text)
     warm_hits = WARM_PATTERN.findall(text)
-    word_count = len(text.split())
+    cjk_count = len(_CJK_CHARACTER_PATTERN.findall(text))
+    non_cjk_words = len(_CJK_CHARACTER_PATTERN.sub(" ", text).split())
+    word_count = cjk_count + non_cjk_words
     too_long_penalty = 0.0
     if word_count > 200:
         too_long_penalty = min(0.4, (word_count - 200) / 400)

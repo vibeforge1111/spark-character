@@ -78,7 +78,7 @@ def _digest(rows: list[dict]) -> dict:
                 "ts": r.get("ts"),
                 "rewrite": rewrite,
                 "trace_ref": r.get("trace_ref"),
-                "preview": (r.get("reply_preview") or "")[:120],
+                "preview": str(r.get("reply_preview") or "")[:120],
             })
         chip = r.get("chip")
         if chip:
@@ -159,7 +159,10 @@ def main() -> int:
     digest = _digest(rows)
 
     if args.json:
-        print(json.dumps(digest, indent=2))
+        if getattr(sys.stdout, "isatty", lambda: False)():
+            print(json.dumps(digest, indent=2))
+        else:
+            print(json.dumps(digest, separators=(",", ":")))
         return 0
 
     if not rows:

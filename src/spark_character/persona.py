@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +23,7 @@ LATEST_POINTER = ARTIFACTS_DIR / "persona.latest.txt"
 POINTER_CHANGE_LOG = ARTIFACTS_DIR / "persona.pointer.log"
 DEFAULT_PERSONA_VERSION = "v1"
 PERSONA_VERSION_PATTERN = re.compile(r"^v[1-9][0-9]*$")
+OVERLAY_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
 @dataclass(frozen=True)
@@ -40,7 +43,10 @@ def load_overlay(provider_kind: str | None) -> str:
     'openai', 'ollama'. Unknown kinds return ''."""
     if not provider_kind:
         return ""
-    path = OVERLAYS_DIR / f"{provider_kind.lower().strip()}.md"
+    name = provider_kind.lower().strip()
+    if not OVERLAY_NAME_PATTERN.fullmatch(name):
+        return ""
+    path = OVERLAYS_DIR / f"{name}.md"
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
@@ -52,7 +58,10 @@ def load_surface_overlay(surface: str | None) -> str:
     'tui', 'cli'. Unknown surfaces return ''."""
     if not surface:
         return ""
-    path = OVERLAYS_DIR / "surface" / f"{surface.lower().strip()}.md"
+    name = surface.lower().strip()
+    if not OVERLAY_NAME_PATTERN.fullmatch(name):
+        return ""
+    path = OVERLAYS_DIR / "surface" / f"{name}.md"
     if not path.exists():
         return ""
     return sanitize_prompt_text(path.read_text(encoding="utf-8")).strip()
@@ -86,7 +95,7 @@ def validate_persona_version(version: str) -> str:
 
 def protect_latest_pointer(path: Path = LATEST_POINTER) -> None:
     if path.exists():
-        os.chmod(path, 0o444)
+        os.chmod(path, stat.S_IREAD if os.name == "nt" else 0o444)
 
 
 def set_latest_persona_version(
@@ -106,15 +115,36 @@ def set_latest_persona_version(
 
     previous = pointer_path.read_text(encoding="utf-8").strip() if pointer_path.exists() else ""
     pointer_path.parent.mkdir(parents=True, exist_ok=True)
-    if pointer_path.exists():
-        os.chmod(pointer_path, 0o666)
-    temp_path = pointer_path.with_name(f".{pointer_path.name}.{os.getpid()}.tmp")
+    temp_path: Path | None = None
+    primary_error: BaseException | None = None
     try:
-        temp_path.write_text(f"{resolved}\n", encoding="utf-8")
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=pointer_path.parent,
+            prefix=f".{pointer_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            handle.write(f"{resolved}\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        if os.name == "nt" and pointer_path.exists():
+            os.chmod(pointer_path, stat.S_IREAD | stat.S_IWRITE)
         os.replace(temp_path, pointer_path)
+        temp_path = None
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
-        temp_path.unlink(missing_ok=True)
-    protect_latest_pointer(pointer_path)
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+        try:
+            protect_latest_pointer(pointer_path)
+        except OSError:
+            if primary_error is None:
+                raise
 
     record = {
         "changed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -123,6 +153,7 @@ def set_latest_persona_version(
         "previous": previous or None,
         "current": resolved,
     }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, sort_keys=True) + "\n")
 
@@ -201,5 +232,7 @@ def load_persona_from_path(path: str | Path) -> PersonaSpec:
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"Persona artifact not found: {p.name}")
+    if not p.is_file():
+        raise ValueError(f"Persona path is not a file: {p.name}")
     version = p.stem.split(".", 1)[-1] if "." in p.stem else "custom"
     return PersonaSpec(version=version, text=sanitize_prompt_text(p.read_text(encoding="utf-8")))

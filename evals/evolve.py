@@ -23,8 +23,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import tempfile
 import time
 from pathlib import Path
 from statistics import mean as mean_
@@ -100,7 +102,8 @@ def baseline_score(provider: ProviderSpec, persona: PersonaSpec) -> tuple[float,
                 means_per_axis[k].append(getattr(score, k))
         except Exception as exc:
             rows.append({"prompt": prompt, "error": str(exc)})
-    overall = round(mean_([mean_(v) for v in means_per_axis.values() if v]), 3)
+    means = [mean_(values) for values in means_per_axis.values() if values]
+    overall = round(mean_(means), 3) if means else 0.0
     return overall, rows
 
 
@@ -140,6 +143,30 @@ def diagnose_weaknesses(rows: list[dict]) -> list[str]:
     return out[:8] or ["No specific failures, push for sharper warmth and brevity."]
 
 
+def _write_persona_artifact(path: Path, text: str) -> None:
+    """Atomically publish a complete persona artifact before pointer promotion."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidates", type=int, default=3)
@@ -163,6 +190,7 @@ def main() -> int:
     print()
 
     candidates = []
+    candidate_errors: list[dict[str, int | str]] = []
     for i in range(args.candidates):
         print(f"[candidate {i + 1}] mutating + scoring...")
         t0 = time.time()
@@ -173,7 +201,9 @@ def main() -> int:
             candidates.append({"index": i + 1, "text": text, "overall": overall, "rows": rows})
             print(f"[candidate {i + 1}] overall={overall} in {time.time() - t0:.1f}s\n")
         except Exception as exc:
-            print(f"[candidate {i + 1}] ERROR: {exc}\n")
+            error_type = type(exc).__name__
+            candidate_errors.append({"index": i + 1, "error_type": error_type})
+            print(f"[candidate {i + 1}] ERROR: {error_type}\n")
 
     candidates.sort(key=lambda c: c["overall"], reverse=True)
     print("=== verdict ===")
@@ -186,7 +216,7 @@ def main() -> int:
     if promote and not args.dry_run:
         new_n = n + 1
         new_path = ARTIFACTS_DIR / f"persona.v{new_n}.md"
-        new_path.write_text(winner["text"], encoding="utf-8")
+        _write_persona_artifact(new_path, winner["text"])
         set_latest_persona_version(
             f"v{new_n}",
             actor="evals/evolve.py",
@@ -198,14 +228,20 @@ def main() -> int:
     else:
         print("\nNO PROMOTION: baseline still wins.")
 
-    Path(args.out).write_text(
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
         json.dumps({
             "baseline_version": n,
             "baseline_overall": baseline_overall,
             "candidates": [{"index": c["index"], "overall": c["overall"]} for c in candidates],
+            "candidate_attempts": args.candidates,
+            "candidate_error_count": len(candidate_errors),
+            "candidate_errors": candidate_errors,
             "winner_text": winner["text"] if winner else None,
             "promoted": bool(promote and not args.dry_run),
-        }, indent=2)
+        }, indent=2),
+        encoding="utf-8",
     )
     return 0
 

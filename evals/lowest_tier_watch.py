@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -45,6 +46,8 @@ HISTORY_FILE_DEFAULT = Path("evals/_score_history.jsonl")
 STATE_FILE_DEFAULT = Path("evals/_lowest_tier_watch_state.json")
 HEARTBEAT_FILE_DEFAULT = Path("evals/_lowest_tier_watch_heartbeat.txt")
 EVOLUTION_SUBPROCESS_TIMEOUT_SECONDS = 2400
+
+logger = logging.getLogger(__name__)
 
 TIER_KEYS = (
     "t1_mean", "t2_mean", "t3_mean", "t4_mean",
@@ -97,16 +100,23 @@ def _load_state(path: Path) -> dict:
 def _save_state(path: Path, state: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def _write_heartbeat(path: Path, phase: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{int(time.time())} {phase}\n", encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "lowest-tier watcher heartbeat write failed (phase=%s, error=%s)",
+            phase,
+            type(exc).__name__,
+        )
 
 
 def find_lowest_tier(history: list[dict], *, min_runs: int) -> tuple[str | None, float, int]:

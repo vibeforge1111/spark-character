@@ -12,9 +12,9 @@ uncertainty, and initiative.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
+from ._scoring_utils import parse_judge_score
 from .persona import PersonaSpec, load_persona
 from .pipeline import generate
 from .provider import ProviderSpec, call_provider
@@ -223,12 +223,4 @@ def run_probe(
 
 
 def _parse_score(text: str) -> int:
-    if not text:
-        return 5
-    match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
-    if match:
-        return max(0, min(10, int(match.group(1))))
-    digits = re.findall(r"\b([0-9]|10)\b", text)
-    if digits:
-        return max(0, min(10, int(digits[0])))
-    return 5
+    return parse_judge_score(text)

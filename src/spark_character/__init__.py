@@ -1,5 +1,6 @@
 """spark-character: provider-agnostic voice and character for Spark agents."""
 
+from ._scoring_utils import JudgeScoreUnavailable
 from .audit_miner import (
     AuditFailure,
     AuditFindings,
@@ -70,6 +71,9 @@ from .memory_grounded import (
     state_distribution,
 )
 from .registry import (
+    ChipLabNotFoundError,
+    ChipLabPromotionError,
+    PyYamlMissingError,
     find_chip_lab_path,
     promote_evolved_chip_to_chip_lab,
     promote_evolved_persona_to_chip_lab,
@@ -115,6 +119,7 @@ from .output_sanitizer import (
 )
 from .voice_judge import (
     DistinctivenessScore,
+    VoiceCorpusUnavailable,
     score_distinctiveness,
     score_distinctiveness_async,
 )
@@ -136,6 +141,7 @@ __all__ = [
     "sanitize_voice_output",
     "strip_markdown_emphasis",
     "GenerationResult",
+    "JudgeScoreUnavailable",
     "PROBES",
     "PersonaScore",
     "PersonaSpec",
@@ -152,6 +158,9 @@ __all__ = [
     "chip_context_for",
     "find_chip_lab_path",
     "known_chip_keys",
+    "ChipLabNotFoundError",
+    "ChipLabPromotionError",
+    "PyYamlMissingError",
     "promote_evolved_chip_to_chip_lab",
     "promote_evolved_persona_to_chip_lab",
     "load_chip",
@@ -205,6 +214,7 @@ __all__ = [
     "run_probe",
     "score_distinctiveness",
     "score_distinctiveness_async",
+    "VoiceCorpusUnavailable",
     "score_persona",
     "__version__",
 ]

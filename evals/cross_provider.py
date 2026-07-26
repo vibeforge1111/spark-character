@@ -60,6 +60,7 @@ PROMPTS = [
     "Quick gut check: ship the redesign or hold a week?",
     "What can you actually help me with right now?",
 ]
+KNOWN_PROVIDER_NAMES = ("codex", "minimax", "openai", "zai")
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,8 @@ def resolve_providers(names: list[str]) -> list[ProviderProfile]:
     out: list[ProviderProfile] = []
     for name in names:
         n = name.lower().strip()
+        if not n:
+            continue
         if n == "zai":
             api_key = os.environ.get("ZAI_API_KEY")
             if not api_key:
@@ -112,8 +115,15 @@ def resolve_providers(names: list[str]) -> list[ProviderProfile]:
         elif n == "codex":
             spec = CodexSpec()
             if not codex_available(spec):
+                print("[cross_provider] skipping 'codex' (binary not on PATH)", file=sys.stderr)
                 continue
             out.append(ProviderProfile(name="codex", spec=spec, kind="codex"))
+        else:
+            print(
+                f"[cross_provider] unknown provider {n!r}; "
+                f"known: {', '.join(KNOWN_PROVIDER_NAMES)}",
+                file=sys.stderr,
+            )
     return out
 
 

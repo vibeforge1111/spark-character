@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
@@ -50,6 +51,9 @@ from spark_character.audit_miner import LLM_ROUTES, _detect_failures  # noqa: E4
 OBSERVATIONS_FILE_DEFAULT = Path("evals/_observations.jsonl")
 SEEN_FILE_DEFAULT = Path("evals/_observer_seen.json")
 HEARTBEAT_FILE_DEFAULT = Path("evals/_observer_heartbeat.txt")
+MAX_SEEN_REFS = 5000
+
+logger = logging.getLogger(__name__)
 
 
 META_OBSERVER_SYSTEM = (
@@ -98,20 +102,64 @@ class Observation:
     parsed: dict
 
 
-def _load_seen(path: Path) -> set[str]:
+def _load_seen(path: Path) -> dict[str, None]:
     if not path.exists():
-        return set()
+        return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return set(data.get("seen_trace_refs", []))
-    except Exception:
-        return set()
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict) or not isinstance(data.get("seen_trace_refs"), list):
+        return {}
+    refs: dict[str, None] = {}
+    for ref in data["seen_trace_refs"]:
+        if isinstance(ref, str) and ref:
+            refs.setdefault(ref, None)
+    return dict(list(refs.items())[-MAX_SEEN_REFS:])
 
 
-def _save_seen(path: Path, seen: set[str]) -> None:
+def _remember_seen(seen: dict[str, None], trace_ref: str) -> None:
+    if not trace_ref:
+        return
+    seen.pop(trace_ref, None)
+    seen[trace_ref] = None
+    while len(seen) > MAX_SEEN_REFS:
+        seen.pop(next(iter(seen)))
+
+
+def _load_seen_from_observations(path: Path) -> dict[str, None]:
+    if not path.exists():
+        return {}
+    refs: dict[str, None] = {}
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                ref = row.get("trace_ref")
+                if isinstance(ref, str):
+                    _remember_seen(refs, ref)
+    except OSError:
+        return {}
+    return refs
+
+
+def _merge_seen(*states: dict[str, None]) -> dict[str, None]:
+    merged: dict[str, None] = {}
+    for state in states:
+        for trace_ref in state:
+            _remember_seen(merged, trace_ref)
+    return merged
+
+
+def _save_seen(path: Path, seen: dict[str, None]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Cap stored IDs to last 5000 to bound state size
-    capped = list(seen)[-5000:]
+    capped = list(seen)[-MAX_SEEN_REFS:]
     path.write_text(
         json.dumps({"seen_trace_refs": capped}, indent=2),
         encoding="utf-8",
@@ -138,8 +186,12 @@ def _write_heartbeat(path: Path, phase: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{int(time.time())} {phase}\n", encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "observer heartbeat write failed (phase=%s, error=%s)",
+            phase,
+            type(exc).__name__,
+        )
 
 
 def parse_observation_response(text: str) -> dict:
@@ -297,7 +349,7 @@ def main() -> int:
     )
     _write_heartbeat(heartbeat_path, "boot")
 
-    seen = _load_seen(seen_path)
+    seen = _merge_seen(_load_seen(seen_path), _load_seen_from_observations(obs_path))
     observed_count = 0
 
     def process_row(row: dict) -> None:
@@ -344,7 +396,7 @@ def main() -> int:
         _append_observation(obs_path, obs)
         observed_count += 1
         if trace_ref:
-            seen.add(trace_ref)
+            _remember_seen(seen, trace_ref)
         scores = parsed.get("scores", {})
         rec = parsed.get("recommendation_tier", "?")
         landed = (parsed.get("landed_well") or "")[:100]

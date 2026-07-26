@@ -41,7 +41,7 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
 
@@ -111,9 +111,11 @@ def search_results_for(
     if search_fn is None and not _network_policy_allows_live_search(network_policy):
         logger.warning("Live search skipped; network policy did not authorize the default backend.")
         return []
-    fn = search_fn or _duckduckgo_html_search
     try:
-        results = fn(query)
+        if search_fn is None:
+            results = _duckduckgo_html_search(query, timeout_seconds=timeout_seconds)
+        else:
+            results = search_fn(query)
         return results[:max_results]
     except (httpx.HTTPError, OSError, ValueError) as exc:
         logger.warning("Live search failed; returning no results (%s).", type(exc).__name__)
@@ -157,8 +159,9 @@ def attach_search_context(
         context_lines.append(f"{i}. {title}")
         if snippet:
             context_lines.append(f"   {snippet}")
-        if r.url:
-            context_lines.append(f"   source: {r.url}")
+        safe_url = _safe_search_context_url(r.url)
+        if safe_url:
+            context_lines.append(f"   source: {safe_url}")
     context_lines.append("</live_search_results>")
     context_lines.append("")
     context_lines.append("[User message]")
@@ -168,6 +171,21 @@ def attach_search_context(
 
 def _safe_search_context_text(text: str) -> str:
     return sanitize_prompt_text(str(text or "")).strip()
+
+
+def _safe_search_context_url(url: str) -> str:
+    """Return one safe HTTP(S) source line from an untrusted result URL."""
+    first_line = str(url or "").splitlines()[0].strip()
+    if not first_line:
+        return ""
+    try:
+        parsed = urlparse(first_line)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+            return ""
+    except ValueError:
+        return ""
+    safe = _safe_search_context_text(first_line)
+    return safe.replace("<", "%3C").replace(">", "%3E")
 
 
 def _network_policy_allows_live_search(
@@ -189,7 +207,11 @@ def _network_policy_allows_live_search(
     )
 
 
-def _duckduckgo_html_search(query: str) -> list[SearchResult]:
+def _duckduckgo_html_search(
+    query: str,
+    *,
+    timeout_seconds: float = 8.0,
+) -> list[SearchResult]:
     """Default backend: DuckDuckGo HTML scrape. No auth, no key.
 
     Hits html.duckduckgo.com (the result-serving subdomain) with a
@@ -209,7 +231,7 @@ def _duckduckgo_html_search(query: str) -> list[SearchResult]:
             "Chrome/120.0 Safari/537.36"
         ),
     }
-    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+    with httpx.Client(timeout=timeout_seconds, follow_redirects=True) as client:
         resp = client.get(url, params={"q": query}, headers=headers)
         resp.raise_for_status()
         html_text = resp.text
@@ -224,6 +246,7 @@ _SNIPPET_RE = re.compile(
     r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>',
     re.IGNORECASE | re.DOTALL,
 )
+_HTML_TAG_RE = re.compile(r"<[^>]*>")
 
 
 def _parse_duckduckgo_html(text: str) -> list[SearchResult]:
@@ -231,10 +254,10 @@ def _parse_duckduckgo_html(text: str) -> list[SearchResult]:
     titles = _RESULT_BLOCK_RE.findall(text or "")
     snippets = _SNIPPET_RE.findall(text or "")
     for i, (raw_url, raw_title) in enumerate(titles[:10]):
-        clean_title = _strip_tags(html.unescape(raw_title)).strip()
+        clean_title = _strip_tags(raw_title).strip()
         clean_snippet = ""
         if i < len(snippets):
-            clean_snippet = _strip_tags(html.unescape(snippets[i])).strip()
+            clean_snippet = _strip_tags(snippets[i]).strip()
         url = _decode_duckduckgo_redirect(html.unescape(raw_url))
         if not clean_title and not clean_snippet:
             continue
@@ -261,4 +284,4 @@ def _decode_duckduckgo_redirect(raw_url: str) -> str:
 
 
 def _strip_tags(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text)
+    return html.unescape(_HTML_TAG_RE.sub("", text))

@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import json
 import random
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from ._scoring_utils import parse_judge_score
 from .persona import ARTIFACTS_DIR
 from .provider import ProviderSpec, call_provider, call_provider_async
 
@@ -48,31 +48,54 @@ class DistinctivenessScore:
         return self.score >= 0.6
 
 
+class VoiceCorpusUnavailable(RuntimeError):
+    """Raised when a distinctiveness comparison lacks either voice corpus."""
+
+
 def _load_corpus(path: Path) -> list[dict]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
-    return list(data.get("entries") or [])
+    if not isinstance(data, dict):
+        return []
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        return []
+    return [
+        entry
+        for entry in entries
+        if isinstance(entry, dict)
+        and isinstance(entry.get("text"), str)
+        and entry["text"].strip()
+    ]
 
 
 def _format_examples(label: str, samples: list[dict]) -> str:
     lines = [f"[Voice {label}]"]
-    for i, s in enumerate(samples, 1):
-        lines.append(f"{label}{i}. {s['text']}")
+    texts = [
+        sample["text"]
+        for sample in samples
+        if isinstance(sample, dict)
+        and isinstance(sample.get("text"), str)
+        and sample["text"].strip()
+    ]
+    for i, text in enumerate(texts, 1):
+        lines.append(f"{label}{i}. {text}")
     return "\n".join(lines)
 
 
+def _require_comparable_corpora(golden: list[dict], foil: list[dict]) -> None:
+    missing = [label for label, corpus in (("golden", golden), ("foil", foil)) if not corpus]
+    if missing:
+        raise VoiceCorpusUnavailable(
+            "Voice distinctiveness requires non-empty golden and foil corpora; "
+            f"unavailable: {', '.join(missing)}."
+        )
+
+
 def _parse_score(text: str) -> int:
-    if not text:
-        return 5
-    match = re.search(r"SCORE\s*=\s*(\d+)", text, re.IGNORECASE)
-    if match:
-        return max(0, min(10, int(match.group(1))))
-    digits = re.findall(r"\b([0-9]|10)\b", text)
-    if digits:
-        return max(0, min(10, int(digits[0])))
-    return 5
+    return parse_judge_score(text)
 
 
 def _build_judge_prompt(
@@ -102,6 +125,7 @@ def score_distinctiveness(
     rng = rng or random.Random(7)
     golden = _load_corpus(golden_path or (CORPUS_DIR / GOLDEN_DEFAULT))
     foil = _load_corpus(foil_path or (CORPUS_DIR / FOIL_DEFAULT))
+    _require_comparable_corpora(golden, foil)
     g = rng.sample(golden, min(samples_per_side, len(golden)))
     f = rng.sample(foil, min(samples_per_side, len(foil)))
     user_prompt = _build_judge_prompt(reply=reply, golden_samples=g, foil_samples=f)
@@ -129,6 +153,7 @@ async def score_distinctiveness_async(
     rng = rng or random.Random(7)
     golden = _load_corpus(golden_path or (CORPUS_DIR / GOLDEN_DEFAULT))
     foil = _load_corpus(foil_path or (CORPUS_DIR / FOIL_DEFAULT))
+    _require_comparable_corpora(golden, foil)
     g = rng.sample(golden, min(samples_per_side, len(golden)))
     f = rng.sample(foil, min(samples_per_side, len(foil)))
     user_prompt = _build_judge_prompt(reply=reply, golden_samples=g, foil_samples=f)

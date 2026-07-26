@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -115,6 +116,18 @@ def test_parse_trait_response_handles_preamble() -> None:
     assert parsed["deltas"] == {"openness": 0.03}
 
 
+def test_parse_trait_response_handles_braces_inside_strings_and_trailing_text() -> None:
+    raw = (
+        'Analysis follows: {"reasoning":"raise {openness}, keep } literal",'
+        '"deltas":{"openness":0.03}} trailing commentary'
+    )
+
+    parsed = _parse_trait_response(raw)
+
+    assert parsed["reasoning"] == "raise {openness}, keep } literal"
+    assert parsed["deltas"] == {"openness": 0.03}
+
+
 def test_parse_trait_response_returns_empty_on_garbage() -> None:
     assert _parse_trait_response("") == {}
     assert _parse_trait_response("not json at all") == {}
@@ -152,3 +165,49 @@ def test_chip_to_yaml_dict_after_mutation_reflects_new_values(
     assert spec["traits"]["openness"] == round(chip.openness + 0.05, 3)
     # other traits unchanged
     assert spec["traits"]["conscientiousness"] == chip.conscientiousness
+
+
+def test_chip_to_yaml_dict_writes_back_mutated_preferences(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chip = load_mutation_test_chip(tmp_path, monkeypatch)
+    changed = replace(
+        chip,
+        communication={"style": "concise"},
+        decision_making={"bias": "evidence"},
+        likes=["plain language"],
+        dislikes=["false certainty"],
+    )
+
+    preferences = chip_to_yaml_dict(changed)["preferences"]
+
+    assert preferences == {
+        "communication": {"style": "concise"},
+        "decision_making": {"bias": "evidence"},
+        "likes": ["plain language"],
+        "dislikes": ["false certainty"],
+    }
+
+
+def test_chip_to_yaml_dict_preserves_intentional_preference_clears(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chip = load_mutation_test_chip(tmp_path, monkeypatch)
+    chip._raw["preferences"] = {
+        "communication": {"style": "verbose"},
+        "decision_making": {"bias": "speed"},
+        "likes": ["old"],
+        "dislikes": ["old"],
+    }
+    cleared = replace(chip, communication={}, decision_making={}, likes=[], dislikes=[])
+
+    preferences = chip_to_yaml_dict(cleared)["preferences"]
+
+    assert preferences == {
+        "communication": {},
+        "decision_making": {},
+        "likes": [],
+        "dislikes": [],
+    }

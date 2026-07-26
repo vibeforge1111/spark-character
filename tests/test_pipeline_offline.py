@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from spark_character import (
     ProviderSpec,
     generate,
     generate_with_critique,
+    generate_with_critique_async,
     load_critic,
     load_persona,
 )
@@ -37,16 +39,16 @@ def test_generate_returns_draft_only() -> None:
     assert result.critic_version is None
 
 
-def test_critique_pass_keeps_draft() -> None:
+def test_local_gate_pass_keeps_draft_without_claiming_critic_version() -> None:
     persona = load_persona("v1")
     critic = load_critic("v1")
     with patch(
         "spark_character.pipeline.call_provider",
         return_value="Ship the redesign now. Three reasons follow.",
     ), patch(
-        "spark_character.critic.call_provider",
-        return_value="PASS",
-    ):
+        "spark_character.pipeline.score_persona",
+        return_value=SimpleNamespace(passed=True),
+    ), patch("spark_character.pipeline.critique") as critic_call:
         result = generate_with_critique(
             "Should I ship?",
             provider=PROVIDER,
@@ -55,7 +57,32 @@ def test_critique_pass_keeps_draft() -> None:
         )
     assert result.final == "Ship the redesign now. Three reasons follow."
     assert not result.rewritten
-    assert result.critic_version == "v1"
+    assert result.critic_version is None
+    critic_call.assert_not_called()
+
+
+def test_async_local_gate_pass_keeps_draft_without_claiming_critic_version() -> None:
+    persona = load_persona("v1")
+    critic = load_critic("v1")
+    provider_call = AsyncMock(return_value="Ship the redesign now. Three reasons follow.")
+    critic_call = AsyncMock()
+    with patch("spark_character.pipeline.call_provider_async", provider_call), patch(
+        "spark_character.pipeline.score_persona",
+        return_value=SimpleNamespace(passed=True),
+    ), patch("spark_character.pipeline.critique_async", critic_call):
+        result = asyncio.run(
+            generate_with_critique_async(
+                "Should I ship?",
+                provider=PROVIDER,
+                persona=persona,
+                critic=critic,
+            )
+        )
+
+    assert result.final == "Ship the redesign now. Three reasons follow."
+    assert not result.rewritten
+    assert result.critic_version is None
+    critic_call.assert_not_awaited()
 
 
 def test_critic_pass_token_requires_exact_match() -> None:

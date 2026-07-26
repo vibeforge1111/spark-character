@@ -122,6 +122,21 @@ def test_rendered_chip_prompt_prioritizes_local_list_references(tmp_path: Path, 
     assert "older memory" in prompt
 
 
+def test_rendered_chip_prompt_keeps_string_strengths_and_vulnerabilities(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "founder-operator.personality.yaml"
+    path.write_text(VALID_CHIP_YAML, encoding="utf-8")
+    chip = load_fallback_chip(path, monkeypatch)
+    chip.strengths = ["direct"]
+    chip.vulnerabilities = ["impatient"]
+
+    prompt = chip_loader.render_chip_to_system_prompt(chip)
+
+    assert "- direct" in prompt
+    assert "- impatient" in prompt
+
+
 def test_load_chip_by_id_skips_malformed_yaml_and_finds_valid_chip(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -178,6 +193,40 @@ def test_load_chip_by_id_allows_non_path_dotted_chip_id(
     chip = chip_loader.load_chip_by_id(chip_id, search_paths=[tmp_path])
 
     assert chip.id == chip_id
+
+
+@pytest.mark.parametrize("chip_id", ["foo..bar", ".hidden", "space id", "x" * 65])
+def test_load_chip_by_id_rejects_unbounded_identifiers(tmp_path: Path, chip_id: str) -> None:
+    with pytest.raises(ValueError, match="bounded identifier"):
+        chip_loader.load_chip_by_id(chip_id, search_paths=[tmp_path])
+
+
+def test_load_chip_by_id_rejects_symlink_escape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lab = tmp_path / "lab"
+    lab.mkdir()
+    outside = tmp_path / "outside.personality.yaml"
+    outside.write_text(VALID_CHIP_YAML, encoding="utf-8")
+    link = lab / "founder-operator.personality.yaml"
+    try:
+        link.symlink_to(outside)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    monkeypatch.setattr(chip_loader, "_LAB_AVAILABLE", False)
+    monkeypatch.setattr(chip_loader, "_lab_load_personality", None)
+
+    with pytest.raises(FileNotFoundError):
+        chip_loader.load_chip_by_id("founder-operator", search_paths=[lab])
+
+
+def test_fallback_loader_accepts_utf8_bom(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "founder-operator.personality.yaml"
+    path.write_text("\ufeff" + VALID_CHIP_YAML, encoding="utf-8")
+
+    chip = load_fallback_chip(path, monkeypatch)
+
+    assert chip.id == "founder-operator"
 
 
 def test_load_chip_by_id_omits_unavailable_desktop_lab_from_default_paths(

@@ -3,9 +3,14 @@
 T1: surface mechanics (em dash, plumbing, reset, hedge, voice heuristic)
 T2: distinctiveness (LLM judge against golden vs foil corpus)
 T3: behavioral probes (per-trait LLM judge on scripted scenarios)
+T4: multi-turn adversarial stability
+T6: emotional attunement | T7: memory coherence
+T8: initiative           | T9: aesthetic fingerprint
+T11: sustained-attack stability (opt-in via --include-sustained)
 
 Prints a tiered scorecard and writes the full transcript to disk.
-Exit code 0 if T1 mean >= 0.95 and T2 mean >= 0.6 and T3 mean >= 0.6.
+Exit code 0 if T1 mean >= 0.95 and T2/T3/T4/T6/T7/T8/T9 means each >= 0.6
+(plus T11 mean >= 0.6 when --include-sustained is set). Else exit 1.
 """
 
 from __future__ import annotations
@@ -47,6 +52,12 @@ T1_PROMPTS = [
     ("explain",        "Explain the difference between a seed round and a Series A in two sentences."),
     ("recommend",      "Should I prioritize fundraising or shipping the product first?"),
 ]
+
+
+def _missing_score_count(rows: list[dict], *, expected: int, score_key: str) -> int:
+    """Count failed and absent evaluations without letting partial means pass."""
+    scored = sum(1 for row in rows if score_key in row)
+    return max(0, expected - scored)
 
 
 def _positive_int(value: str) -> int:
@@ -97,6 +108,7 @@ def main() -> int:
             t2 = score_distinctiveness(result.final, provider=provider)
         except Exception as exc:
             print(f"[{label}] T2 judge error: {exc}")
+            t2_rows.append({"label": label, "error": str(exc)})
             t2 = None
         dt = time() - t0
         first_line = (result.final.splitlines() or [""])[0][:90]
@@ -294,11 +306,11 @@ def main() -> int:
     print(f"T3 behavioral mean:      {t3_mean}")
     print(f"T4 stability mean:       {t4_mean}")
     print(f"T6 emotional mean:       {t6_mean}")
-    print(f"T7 memory coherence mean:{t7_mean}")
+    print(f"T7 memory coherence mean: {t7_mean}")
     print(f"T8 initiative mean:      {t8_mean}")
     print(f"T9 aesthetic mean:       {t9_mean}")
     if t11_mean is not None:
-        print(f"T11 sustained-attack mean:{t11_mean}")
+        print(f"T11 sustained-attack mean:  {t11_mean}")
     print()
     print("T3 per-trait:")
     for r in t3_rows:
@@ -320,6 +332,23 @@ def main() -> int:
         for r in t11_rows:
             if "score" in r:
                 print(f"  {r['scenario_id']:<32} trait={r['trait']:<40} score={r['score']:.2f}")
+
+    coverage_errors = {
+        "t1": _missing_score_count(t1_rows, expected=len(T1_PROMPTS), score_key="t1_mean"),
+        "t2": _missing_score_count(t2_rows, expected=len(T1_PROMPTS), score_key="score"),
+        "t3": _missing_score_count(t3_rows, expected=len(PROBES), score_key="score"),
+        "t4": _missing_score_count(t4_rows, expected=len(STABILITY_SCENARIOS), score_key="score"),
+        "t6": _missing_score_count(t6_rows, expected=len(T6_EMOTIONAL_ATTUNEMENT_PROBES), score_key="score"),
+        "t7": _missing_score_count(t7_rows, expected=len(T7_MEMORY_COHERENCE_PROBES), score_key="score"),
+        "t8": _missing_score_count(t8_rows, expected=len(T8_INITIATIVE_PROBES), score_key="score"),
+        "t9": _missing_score_count(t9_rows, expected=len(T9_AESTHETIC_FINGERPRINT_PROBES), score_key="score"),
+        "t11": _missing_score_count(
+            t11_rows,
+            expected=len(T11_SUSTAINED_ATTACK_SCENARIOS) if args.include_sustained else 0,
+            score_key="score",
+        ),
+    }
+    error_count = sum(coverage_errors.values())
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps({
@@ -343,8 +372,13 @@ def main() -> int:
         "t8_mean": t8_mean,
         "t9_mean": t9_mean,
         "t11_mean": t11_mean,
+        "coverage_errors": coverage_errors,
+        "coverage_error_count": error_count,
     }, indent=2))
     print(f"\nFull transcript: {args.out}")
+    if error_count:
+        print(f"ERRORS: {error_count} required evaluation(s) failed or are missing; gating non-zero regardless of mean.")
+        return 1
     base_pass = (
         t1_mean >= 0.95
         and t2_mean >= 0.6

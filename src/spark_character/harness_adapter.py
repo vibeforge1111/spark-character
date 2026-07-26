@@ -48,10 +48,11 @@ def build_run_fn(
     max_tokens: int = 600,
     temperature: float = 0.7,
 ) -> RunFn:
-    p = persona or load_persona(provider_kind=detect_provider_kind(provider))
-    c = critic if (critic is not None or not use_critic) else load_critic()
+    provider_kind = detect_provider_kind(provider) if persona is None else None
 
     async def _run(prompt: str) -> HarnessResult:
+        p = persona if persona is not None else load_persona(provider_kind=provider_kind)
+        c = critic if critic is not None else (load_critic() if use_critic else None)
         if use_critic and c is not None:
             result = await generate_with_critique_async(
                 prompt,

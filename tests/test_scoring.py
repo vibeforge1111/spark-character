@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from spark_character.scoring import score_persona
+from spark_character.scoring import _first_sentence, score_persona
 
 
 def test_em_dash_fails_p1() -> None:
@@ -72,3 +72,19 @@ def test_passed_aggregates_all_axes() -> None:
 def test_failed_when_any_axis_below_threshold() -> None:
     score = score_persona("Great question \u2014 how can I help today?")
     assert not score.passed
+
+
+def test_first_sentence_does_not_split_after_honorific() -> None:
+    assert _first_sentence("Mr. Smith built it. Three reasons follow.") == "Mr. Smith built it."
+
+
+def test_cjk_reply_receives_the_same_verbosity_penalty() -> None:
+    score = score_persona("\u4f60" * 201)
+    assert score.p5_voice < 1.0
+    assert score.p5_reason == "verbose=201w"
+
+
+def test_hangul_reply_receives_the_same_verbosity_penalty() -> None:
+    score = score_persona("\uac00" * 201)
+    assert score.p5_voice < 1.0
+    assert score.p5_reason == "verbose=201w"

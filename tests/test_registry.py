@@ -9,6 +9,10 @@ import yaml
 
 from spark_character.chip_loader import PersonalityChip
 from spark_character.registry import (
+    ChipLabNotFoundError,
+    ChipLabPromotionError,
+    PyYamlMissingError,
+    _atomic_write_text,
     _personality_yaml_path,
     promote_evolved_chip_to_chip_lab,
     promote_evolved_persona_to_chip_lab,
@@ -27,6 +31,57 @@ emotional_profile:
 preferences:
   likes: []
 """
+
+
+def test_atomic_write_creates_parent_and_leaves_no_temporary_file(tmp_path: Path) -> None:
+    target = tmp_path / "new-lab" / "candidate.personality.yaml"
+
+    _atomic_write_text(target, "schema: spark-personality-chip.v1\n")
+
+    assert target.read_text(encoding="utf-8") == "schema: spark-personality-chip.v1\n"
+    assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
+
+
+def test_atomic_write_failure_preserves_existing_target_and_cleans_up(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target = tmp_path / "candidate.personality.yaml"
+    target.write_text("old artifact\n", encoding="utf-8")
+
+    def fail_replace(_source, _target):
+        raise OSError("synthetic replace failure")
+
+    monkeypatch.setattr("spark_character.registry.os.replace", fail_replace)
+
+    with pytest.raises(OSError, match="synthetic replace failure"):
+        _atomic_write_text(target, "new artifact\n")
+
+    assert target.read_text(encoding="utf-8") == "old artifact\n"
+    assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
+
+
+@pytest.mark.parametrize(
+    "promoter",
+    [promote_evolved_persona_to_chip_lab, promote_evolved_chip_to_chip_lab],
+)
+def test_promotion_creates_explicit_missing_lab_directory(tmp_path: Path, promoter) -> None:
+    lab = tmp_path / "new-lab"
+    kwargs = {
+        "base_chip_id": "founder-operator",
+        "base_persona_version": "v8",
+        "new_persona_version": "v9",
+        "lab_path": lab,
+    }
+    if promoter is promote_evolved_persona_to_chip_lab:
+        kwargs["persona_markdown"] = "New voice rules"
+    else:
+        kwargs["chip"] = PersonalityChip(id="founder-operator", name="Founder Operator")
+
+    target = promoter(**kwargs)
+
+    assert target.parent == lab.resolve()
+    assert target.is_file()
 
 
 def test_persona_sidecar_promotion_does_not_export_scores(tmp_path: Path) -> None:
@@ -144,3 +199,58 @@ def test_chip_promotion_rejects_chip_id_path_escape(tmp_path: Path) -> None:
         )
 
     assert not outside.exists()
+
+
+@pytest.mark.parametrize(
+    "promoter",
+    [promote_evolved_persona_to_chip_lab, promote_evolved_chip_to_chip_lab],
+)
+def test_promotion_reports_missing_yaml_with_typed_error(monkeypatch, tmp_path: Path, promoter) -> None:
+    import builtins
+
+    real_import = builtins.__import__
+
+    def no_yaml(name, *args, **kwargs):
+        if name == "yaml":
+            raise ImportError("synthetic missing yaml")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_yaml)
+    kwargs = {
+        "base_chip_id": "founder-operator",
+        "base_persona_version": "v8",
+        "new_persona_version": "v9",
+        "lab_path": tmp_path,
+    }
+    if promoter is promote_evolved_persona_to_chip_lab:
+        kwargs["persona_markdown"] = "New voice rules"
+    else:
+        kwargs["chip"] = PersonalityChip(id="founder-operator", name="Founder Operator")
+
+    with pytest.raises(PyYamlMissingError, match="PyYAML is required"):
+        promoter(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "promoter",
+    [promote_evolved_persona_to_chip_lab, promote_evolved_chip_to_chip_lab],
+)
+def test_promotion_reports_missing_lab_with_typed_error(monkeypatch, promoter) -> None:
+    monkeypatch.setattr("spark_character.registry.find_chip_lab_path", lambda: None)
+    kwargs = {
+        "base_chip_id": "founder-operator",
+        "base_persona_version": "v8",
+        "new_persona_version": "v9",
+    }
+    if promoter is promote_evolved_persona_to_chip_lab:
+        kwargs["persona_markdown"] = "New voice rules"
+    else:
+        kwargs["chip"] = PersonalityChip(id="founder-operator", name="Founder Operator")
+
+    with pytest.raises(ChipLabNotFoundError, match="directory was not found"):
+        promoter(**kwargs)
+
+
+def test_promotion_errors_share_public_base_class() -> None:
+    assert issubclass(PyYamlMissingError, ChipLabPromotionError)
+    assert issubclass(ChipLabNotFoundError, ChipLabPromotionError)
