@@ -98,6 +98,7 @@ def test_failed_full_eval_waits_for_full_interval_before_retry(monkeypatch, tmp_
     monkeypatch.setattr(continuous_eval, "load_persona", lambda **_kwargs: persona)
     monkeypatch.setattr(continuous_eval.time, "time", lambda: next(clock))
     monkeypatch.setattr(continuous_eval.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(continuous_eval._logger, "exception", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(continuous_eval, "_write_heartbeat", lambda *_args: None)
 
     def fail_full(*_args, **_kwargs):

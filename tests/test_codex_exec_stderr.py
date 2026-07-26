@@ -28,6 +28,7 @@ def test_call_codex_redacts_stderr_on_failure(monkeypatch: pytest.MonkeyPatch) -
     def fake_run(*_args, **_kwargs):
         return _FakeCompleted(returncode=7, stderr=secret.encode("utf-8"))
 
+    monkeypatch.setattr(codex_provider, "_resolve_codex_binary", lambda binary: binary)
     monkeypatch.setattr(codex_provider.subprocess, "run", fake_run)
 
     with pytest.raises(RuntimeError) as excinfo:
@@ -47,6 +48,7 @@ def test_call_codex_failure_message_is_generic(monkeypatch: pytest.MonkeyPatch) 
     def fake_run(*_args, **_kwargs):
         return _FakeCompleted(returncode=2, stderr=b"boom")
 
+    monkeypatch.setattr(codex_provider, "_resolve_codex_binary", lambda binary: binary)
     monkeypatch.setattr(codex_provider.subprocess, "run", fake_run)
 
     with pytest.raises(RuntimeError) as excinfo:

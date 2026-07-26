@@ -134,7 +134,7 @@ def test_missing_weighted_baseline_stops_before_mutation(monkeypatch, tmp_path: 
 @pytest.mark.parametrize("weights", ["nan,0,0", "-1,1,1", "0,0,0"])
 def test_cli_rejects_unsafe_weight_sets(weights: str) -> None:
     result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "evals" / "evolve_persona.py"), "--weights", weights],
+        [sys.executable, str(REPO_ROOT / "evals" / "evolve_persona.py"), f"--weights={weights}"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
