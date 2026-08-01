@@ -157,7 +157,10 @@ class AuditMiner:
             if not raw:
                 continue
             try:
-                row = json.loads(raw)
+                try:
+                    row = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
             except json.JSONDecodeError:
                 continue
             if not isinstance(row, dict):
